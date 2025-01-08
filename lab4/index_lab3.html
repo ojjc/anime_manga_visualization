@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSE 332 - Lab 3</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        #section {
+            overflow: auto;
+        }
+        .axis {
+            font: 10px sans-serif;
+        }
+        .dimension {
+            opacity: 0.6;
+        }
+        .dimension:hover {
+            opacity: 1;
+        }
+        #corr-label {
+            font: 12px sans-serif;
+        }
+        .cell {
+            stroke: #fff;
+            stroke-width: 1px;
+        }
+        #correlation-matrix {
+            float: left;
+        }
+        #legend {
+            float: left;
+            margin-top: 15px;
+        }
+        #legend text {
+            font-size: 10px;
+        }
+        #scatter-plot-matrix {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .scatter-plot {
+            width: 250px;
+            height: 250px;
+        }
+        #explain {
+            color: gray;
+            font-size: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Lab 3 - Advanced Displays of Animes and their Respective Mangas (if they have one)</h1>
+    <h2>CSE 332 - Joseph Jeong</h2>
+
+    <div id="section">
+        <h2>Correlation Matrix</h2>
+        <div id="correlation-matrix"></div>
+        <div id="legend"></div>
+    </div>
+
+    <div id="corr-label">a_score = Anime_Score, a_rank = Anime_Rank, a_pop = Anime_Population, a_mems = Anime_Members</div>
+    <div id="corr-label">m_score = Manga_Score, m_rank = Manga_Rank, m_pop = Manga_Population, m_mems = Manga_Members</div>
+    
+    <div id="section">
+        <h2>Scatter Plot Matrix</h2>
+        <div id="scatter-plot-matrix"></div>
+    </div>
+        
+    <div id="section">
+        <h2>Parallel Coordinates Display</h2>
+        <div id="parallel-coordinates"></div>
+        <h3 id=explain>using only top 1000 ranked anime from now on to make data visualization simpler to see and understand</h3>
+    </div>
+        
+    <div id="section">
+        <h2>PCA Plot</h2>
+        <div id="pca-plot"></div>
+    </div>
+        
+    <div id="section">
+        <h2>Scree Plot</h2>
+        <div id="scree-plot"></div>
+    </div>
+        
+    <div id="section">
+        <h2>Biplot</h2>
+        <div id="biplot"></div>
+    </div>
+        
+    <div id="section">
+        <h2>MDS with Euclidean Distance</h2>
+        <div id="mds-euclidean"></div>
+    </div>
+        
+    <div id="section">
+        <h2>MDS with 1-|correlation| Distance</h2>
+        <div id="mds-correlation"></div>
+    </div>
+    
+    <script>  
+        // ======================================================= CORRELATION MATRIX =======================================================
+        async function createCorrelationMatrix() {
+            const data = await d3.csv('correlation_matrix.csv'); 
+
+            // need to abbreviate names so that labels don't overlap
+            const fullNames = [
+                "Anime Score", "Anime Rank", "Anime Popularity", "Anime Members",
+                "Manga Score", "Manga Rank", "Manga Popularity", "Manga Members"
+            ];
+            const abbrs = [
+                "a_score", "a_rank", "a_pop", "a_mems",
+                "m_score", "m_rank", "m_pop", "m_mems"
+            ];
+
+            // getting attribute names
+            const attr = Object.keys(data[0]);
+            // mapping data into a numeric matrix
+            const matrix = data.map(row => attr.map(attr => +row[attr])); 
+
+            // setting dimensions
+            const width = 500;
+            const height = 500;
+            const margin = { top: 20, right: 150, bottom: 40, left: 100 };
+
+            const svg = d3.select("#correlation-matrix").append("svg")
+                .attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
+                .append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const color_scale = d3.scaleLinear()
+                .domain([-1, 0, 1]).range(["blue", "white", "red"]);
+
+            // row creation
+            const row = svg.selectAll(".row")
+                .data(matrix)
+                .enter().append("g").attr("class", "row").attr("transform", (d, i) => `translate(0, ${i * (height / attr.length)})`);
+
+            // cells
+            row.selectAll(".cell")
+                .data((d) => d.map((value, j) => ({ value, row: attr[j], col: attr[j] })))
+                .enter().append("rect").attr("class", "cell")
+                .attr("x", (d, j) => j * (width / attr.length)).attr("y", 0)
+                .attr("width", width / attr.length).attr("height", height / attr.length)
+                .style("fill", d => color_scale(d.value)).style("stroke", "#fff");
+
+            // row labels
+            svg.selectAll(".row-label")
+                .data(abbrs)
+                .enter().append("text").attr("class", "row-label")
+                .attr("x", -5).attr("y", (d, i) => i * (height / attr.length) + (height / attr.length) / 2).attr("dy", ".35em")
+                .style("text-anchor", "end").text(d => d);
+
+            // col labels
+            svg.append("g").selectAll(".column-label")
+                .data(abbrs)
+                .enter().append("text").attr("class", "column-label")
+                .attr("x", (d, i) => i * (width / attr.length) + (width / attr.length) / 2).attr("y", -15).attr("dy", ".35em")
+                .style("text-anchor", "middle").text(d => d);
+
+            // legend of color scales
+            const legend = d3.select("#legend")
+                .append("svg").attr("width", width).attr("height", height)
+                .attr("class", "legend").style("margin-left", "20px");
+            const legend_scale = d3.scaleLinear()
+                .domain([-1, 1]).range([height, 0]);
+
+            // incorporating coloring into the scale so it looks pretty (0.01 increments to make it look smooth)
+            for (let i = -1; i <= 1; i += 0.01) {
+                legend.append("rect")
+                    .attr("x", 20).attr("y", legend_scale(i))
+                    .attr("width", 20).attr("height", height / 20)
+                    .style("fill", color_scale(i));
+            }
+
+            // showing labels onto scale so readers know what is +corr or -corr
+            legend.append("text").attr("x", 50).attr("y", 15).text("1");
+            legend.append("text").attr("x", 50).attr("y", (height / 2 + 25) / 2).text("0.5");
+            legend.append("text").attr("x", 50).attr("y", height / 2 + 25).text("0");
+            legend.append("text").attr("x", 50).attr("y", height / 2 + 135).text("-0.5");
+            legend.append("text").attr("x", 50).attr("y", height).text("-1");
+
+        }
+
+        createCorrelationMatrix();
+
+        // ======================================================= SCATTER PLOT MATRIX =======================================================
+        async function createScatterPlotMatrix() {
+            try {
+                const data = await d3.csv("numerical_animanga.csv");
+
+                // data cleaning from orig csv file
+                // extract primary genre (from lab 2), classify top genres and stream types, remove NaN values
+                const cleanedData = data.map(d => ({
+                    Anime_Score: +d.Anime_Score, Anime_Rank: +d.Anime_Rank, Anime_Members: +d.Anime_Members,
+                    Manga_Score: +d.Manga_Score, Manga_Rank: +d.Manga_Rank,
+                    Genre: classifyGenre(d.Genres.split(",")[0]),
+                    Stream_type: classifyStreamType(d.Stream_type.trim())
+                })).filter(d =>
+                    !isNaN(d.Anime_Score) && !isNaN(d.Anime_Rank) && !isNaN(d.Anime_Members) && !isNaN(d.Manga_Score) && !isNaN(d.Manga_Rank)
+                );
+
+                // defining top genres/stream type and put everything else in Other (adding all variations makes it look extremely clumped)
+                function classifyGenre(genre) {
+                    const topGenres = ["Action", "Comedy", "Drama"];
+                    return topGenres.includes(genre) ? genre : "Other";
+                }
+                function classifyStreamType(type) {
+                    const topStreamTypes = ["TV", "OVA", "Movie"];
+                    return topStreamTypes.includes(type) ? type : "Other";
+                }
+
+                // formatting large numbers to abbreviate it
+                // 10000 --> 10.0 K
+                // 1000000 --> 1.0 M
+                function formatNumber(value) {
+                    if (value < 1000) return value;
+                    else if (value < 1_000_000) return (value / 1_000).toFixed(1) + 'K';
+                    else return (value / 1_000_000).toFixed(1) + 'M';
+                }
+
+                // defining dimensions
+                const height = 1300;
+                const width = height + 50;
+                const padding = 28;
+                const columns = ["Anime_Score", "Anime_Rank", "Anime_Members", "Manga_Score", "Manga_Rank", "Genre", "Stream_type"];
+                const size = (width - (columns.length + 1) * padding) / columns.length + padding;
+
+                // got schemeCategory10 from d3 website (has different dataviz coloring schemes)
+                const genreColor = d3.scaleOrdinal().domain(["Action", "Comedy", "Drama", "Other"]).range(d3.schemeCategory10);
+
+                // inspired from https://observablehq.com/@d3/splom/2
+                // defining horizontal scales that will apply different based on the data values from a column
+                // if numerical value, apply function
+                const x = columns.map(c => isNumeric(c) ? d3.scaleLinear().domain(d3.extent(cleanedData, d => d[c])).rangeRound([padding / 2, size - padding / 2])
+                                                        : d3.scalePoint().domain([...new Set(cleanedData.map(d => d[c]))]).range([padding / 2, size - padding / 2]).padding(0.5));
+
+                const axisx = g => g.selectAll("g").data(x).join("g").attr("transform", (d, i) => `translate(${i * size},0)`).each(function(d, i) {
+                        const axis = isNumeric(columns[i]) ? d3.axisBottom(d).ticks(6).tickFormat(formatNumber).tickSize(size * columns.length)
+                                                           : d3.axisBottom(d).ticks(6).tickSize(size * columns.length);
+                                    d3.select(this).call(axis);
+                        })
+                        .call(g => g.select(".domain").remove()).call(g => g.selectAll(".tick line").attr("stroke", "#ddd"));
+
+                
+                // defining vertical scales (same process as above)
+                const y = x.map(x => x.copy().range([size - padding / 2, padding / 2]));
+
+                const axisy = g => g.selectAll("g").data(y).join("g").attr("transform", (d, i) => `translate(0,${i * size})`).each(function(d, i) {
+                        const axis = isNumeric(columns[i]) ? d3.axisLeft(d).ticks(6).tickFormat(formatNumber).tickSize(-size * columns.length)
+                                                           : d3.axisLeft(d).ticks(6).tickSize(-size * columns.length);
+                                    d3.select(this).call(axis);
+                        })
+                        .call(g => g.select(".domain").remove()).call(g => g.selectAll(".tick line").attr("stroke", "#ddd"));
+
+                // scatterplot matrix rendering!!!!!
+                const svg = d3.select("#scatter-plot-matrix")
+                    .append("svg")
+                    .attr("width", width)
+                    .attr("height", height)
+                    .attr("viewBox", [-padding, 0, height+200, height+200]);
+
+                svg.append("g").call(axisx);
+                svg.append("g").call(axisy);
+
+                const cell = svg.append("g").selectAll("g")
+                    .data(d3.cross(d3.range(columns.length), d3.range(columns.length)))
+                    .join("g").attr("transform", ([i, j]) => `translate(${i * size},${j * size})`);
+
+                cell.append("rect")
+                    .attr("fill", "none").attr("stroke", "#aaa")
+                    .attr("x", padding / 2 + 0.5).attr("y", padding / 2 + 0.5)
+                    .attr("width", size - padding).attr("height", size - padding);
+
+                // plotting each point and color based on aforementioned coloring style
+                cell.each(function([i, j]) {
+                    d3.select(this).selectAll("circle").data(cleanedData.filter(d => d[columns[i]] !== undefined && d[columns[j]] !== undefined)).join("circle")
+                        .attr("cx", d => x[i](d[columns[i]])).attr("cy", d => y[j](d[columns[j]]))
+                        .attr("r", 3.5).attr("fill-opacity", 0.7).attr("fill", d => genreColor(d.Genre));
+                });
+
+                svg.append("g")
+                    .style("font", "bold 10px sans-serif").selectAll("text")
+                    .data(columns).join("text")
+                    .attr("transform", (d, i) => `translate(${i * size},${i * size})`).attr("x", padding).attr("y", padding).attr("dy", ".71em")
+                    .text(d => d);
+
+            } catch (error) {
+                console.error("error loading numerical_animanga.csv data: ", error);
+            }
+        }
+
+        function isNumeric(column) {
+            return !["Genre", "Stream_type"].includes(column);
+        }
+
+        createScatterPlotMatrix();
+
+        //  ======================================================= PARALLEL COORDINATES CHART =======================================================
+         
+        async function createParallelCoordinatesChart() {
+            try {
+                const data = await d3.csv("top1000_animanga.csv");
+
+                const topGenres = [
+                    "Action", "Comedy", "Drama", "Adventure", "Fantasy", 
+                    "Mystery", "Horror", "Slice of Life", "Romance"
+                ];
+
+                const genreColors = d3.scaleOrdinal().domain(topGenres.concat("Other")).range(d3.schemeCategory10);  
+                const margin = { top: 60, right: 20, bottom: 30, left: 40 };
+                const width = 1200 - margin.left - margin.right;
+                const height = 600 - margin.top - margin.bottom;
+
+                const svg = d3.select("#parallel-coordinates").append("svg")
+                    .attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom).append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                // predetermined A1 -> A2 -> ... -> A8 + 2 categorical vars
+                const columns = [
+                    "Genres", "Anime_Score", "Anime_Rank", "Manga_Score", "Manga_Rank", 
+                    "Manga_Members", "Anime_Members", "Anime_Popularity", 
+                    "Manga_Popularity", "Stream_type"
+                ];
+
+                // getting primary genre
+                data.forEach(d => {
+                    const firstGenre = d.Genres.split(',')[0].trim();
+                    d.Genres = topGenres.includes(firstGenre) ? firstGenre : "Other";
+                });
+
+                // getting x + y scales
+                const y = {};
+                columns.forEach(column => {
+                    if (column === "Genres" || column === "Stream_type") {
+                        y[column] = d3.scalePoint().domain([...new Set(data.map(d => d[column]))].sort())
+                                                    .range([height, 0]);
+                    } else {
+                        y[column] = d3.scaleLinear().domain(d3.extent(data, d => +d[column]))
+                                                    .range([height, 0]);
+                    }
+                });
+                const x = d3.scalePoint().range([0, width]).padding(1).domain(columns);
+
+                // drawing lines for each data point classifying each line based on primary genre
+                // added highlighting based on hover of a specific colored line
+                // highlighting inspired from https://d3-graph-gallery.com/graph/parallel_custom.html
+                svg.append("g").selectAll(".line").data(data).enter().append("path")
+                    .attr("class", d => "line " + d.Genres)
+                    .attr("d", d => d3.line()(columns.map(p => [x(p), y[p](d[p])])))
+                    .style("fill", "none").style("stroke", d => genreColors(d.Genres)).style("stroke-width", 1.5).style("opacity", 0.7)
+                    .on("mouseover", highlight).on("mouseout", resetHighlight);
+
+                // drawing each col axis
+                const axis = svg.selectAll(".dimension").data(columns).enter().append("g")
+                    .attr("class", "dimension").attr("transform", d => `translate(${x(d)})`);
+                axis.append("g").each(function(d) {
+                    d3.select(this).call(d3.axisLeft(y[d]));
+                });
+
+                // label of each col above them
+                axis.append("text").attr("fill", "black")
+                    .attr("y", -10).attr("text-anchor", "middle")
+                    .attr("x", 0).text(d => d)
+                    .style("font-size", "12px");
+
+                // highlight func to grey out everything else that isn't hovered over
+                function highlight(event, d) {
+                    const selectedGenre = d.Genres;
+                    d3.selectAll(".line").transition().duration(200).style("stroke", "lightgrey").style("opacity", 0.1);
+
+                    // punch out colors
+                    d3.selectAll("." + selectedGenre).transition().duration(200).style("stroke", genreColors(selectedGenre)).style("opacity", 1);
+                }
+
+                // reset back to normal
+                function resetHighlight() {
+                    d3.selectAll(".line").transition().duration(200).style("stroke", d => genreColors(d.Genres)).style("opacity", 0.7);
+                }
+            } catch (error) {
+                console.error("error loading top1000_manga.csv:", error);
+            }
+        }
+
+        createParallelCoordinatesChart();
+
+
+        // ======================================================= PCA PLOT ======================================================= 
+
+        async function createPCAPlot() {
+            try {
+                const data = await d3.csv("pca_projection_genres.csv");
+
+                const width = 600, height = 600, margin = 50;
+
+                const svg = d3.select("#pca-plot").append("svg")
+                    .attr("width", width).attr("height", height);
+
+                // scales for PCA plot
+                const xScale = d3.scaleLinear().domain(d3.extent(data, d => +d.PC1)).range([margin, width - margin]);
+                const yScale = d3.scaleLinear().domain(d3.extent(data, d => +d.PC2)).range([height - margin, margin]);
+
+                // coloring scale
+                const color_scale = d3.scaleOrdinal().domain(['Action', 'Comedy', 'Drama', 'Adventure', 'Other'])
+                                                      .range(['blue', 'purple', 'orange', 'green', 'red']);
+
+                // x and y axes
+                svg.append("g").attr("transform", `translate(0, ${height - margin})`).call(d3.axisBottom(xScale));
+                svg.append("g").attr("transform", `translate(${margin}, 0)`).call(d3.axisLeft(yScale));
+
+                // plot pca points based on genre
+                svg.selectAll("circle").data(data).enter().append("circle")
+                    .attr("cx", d => xScale(+d.PC1)).attr("cy", d => yScale(+d.PC2))
+                    .attr("r", 4).attr("fill", d => color_scale(d.Primary_Genre)).attr("opacity", 0.7);
+
+                // axis labelsls
+                svg.append("text").attr("x", width / 2).attr("y", height - 10).attr("text-anchor", "middle").text("PC1");
+                svg.append("text").attr("x", -height / 2).attr("y", 15).attr("transform", "rotate(-90)").attr("text-anchor", "middle").text("PC2");
+
+                // color legend based on genre
+                const legend = svg.selectAll(".legend").data(color_scale.domain()).enter().append("g")
+                    .attr("class", "legend").attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+                legend.append("rect").attr("x", width - 18).attr("width", 18).attr("height", 18).attr("fill", color_scale);
+
+                legend.append("text").attr("x", width - 24).attr("y", 9).attr("dy", "0.35em").attr("text-anchor", "end").text(d => d);
+
+            } catch (err) {
+                console.error("error loading pca data: ", err);
+            }
+        }
+
+        createPCAPlot();
+
+        // ======================================================= SCREE DATA ======================================================= 
+
+        async function createScreePlot() {
+            try {
+                const data = await d3.csv("scree_data.csv");
+
+                const width = 600, height = 500, margin = 50;
+
+                const svg = d3.select("#scree-plot").append("svg").attr("width", width).attr("height", height);
+
+                // scales for scree
+                const xScale = d3.scaleBand().domain(data.map(d => d.Component)).range([margin, width - margin]).padding(0.1);
+                const yScale = d3.scaleLinear().domain([0, d3.max(data, d => +d.ExplainedVariance)]).range([height - margin, margin]);
+
+                // x + y axis
+                svg.append("g").attr("transform", `translate(0, ${height - margin})`).call(d3.axisBottom(xScale));
+                svg.append("g").attr("transform", `translate(${margin}, 0)`).call(d3.axisLeft(yScale));
+
+                // plot scree plot bars
+                svg.selectAll("rect").data(data).enter().append("rect")
+                    .attr("x", d => xScale(d.Component)).attr("y", d => yScale(+d.ExplainedVariance))
+                    .attr("width", xScale.bandwidth()).attr("height", d => height - margin - yScale(+d.ExplainedVariance))
+                    .attr("fill", "blue").attr("opacity", 0.7);
+
+                // axis labels x + y
+                svg.append("text").attr("x", width / 2).attr("y", height - 10)
+                    .attr("text-anchor", "middle").text("Principal Components");
+
+                svg.append("text").attr("x", -height / 2).attr("y", 15)
+                    .attr("transform", "rotate(-90)").attr("text-anchor", "middle").text("Explained Variance Ratio");
+
+            } catch (err) {
+                console.error("error loading scree_data.csv : ", err)
+            }
+        }
+
+        createScreePlot();
+
+        // ======================================================= BIPLOT ======================================================= 
+
+        async function createBiplot() {
+            try {
+                // added loading data
+                const proj = await d3.csv('pca_projection_genres.csv');
+                const loadings = await d3.csv('biplot_loadings.csv');
+
+                const width = 600, height = 600, margin = 50;
+
+                const svg = d3.select("#biplot").append("svg")
+                    .attr("width", width).attr("height", height);
+
+                // x + y scales
+                const xScale = d3.scaleLinear().domain(d3.extent(proj, d => +d.PC1)).range([margin, width - margin]);
+                const yScale = d3.scaleLinear().domain(d3.extent(proj, d => +d.PC2)).range([height - margin, margin]);
+
+                // coloring
+                const color_scale = d3.scaleOrdinal().domain(['Action', 'Comedy', 'Drama', 'Adventure', 'Other'])
+                                                        .range(['blue', 'purple', 'orange', 'green', 'red']);
+
+                // plot pca points like in PCA plot
+                svg.selectAll("circle").data(proj).enter().append("circle")
+                    .attr("cx", d => xScale(+d.PC1)).attr("cy", d => yScale(+d.PC2))
+                    .attr("r", 4).attr("fill", d => color_scale(d.Primary_Genre)).attr("opacity", 0.5);
+
+                // NOW plot loadings
+                svg.selectAll(".arrow").data(loadings).enter().append("line")
+                    .attr("x1", xScale(0)).attr("y1", yScale(0))
+                    .attr("x2", d => xScale(+d.PC1_loading * 5)).attr("y2", d => yScale(+d.PC2_loading * 5)) // scale it larger to make it project more
+                    .attr("stroke", "black").attr("stroke-width", 2).attr("marker-end", "url(#arrow)");
+
+                // and their respective labels
+                svg.selectAll(".label").data(loadings).enter().append("text")
+                    .attr("x", d => xScale(+d.PC1_loading * 5) + 5).attr("y", d => yScale(+d.PC2_loading * 5) + 5)
+                    .text(d => d.Attribute).attr("fill", "red").attr("font-size", "12px");
+
+                // add x + y axis
+                svg.append("g").attr("transform", `translate(0, ${height - margin})`).call(d3.axisBottom(xScale));
+                svg.append("g").attr("transform", `translate(${margin}, 0)`).call(d3.axisLeft(yScale));
+
+                // arrows
+                // from ChatGPT (i didn't know how to add arrows)
+                svg.append("defs").append("marker")
+                    .attr("id", "arrow")
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 10)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                    .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", "black");
+
+                // legend for color of genres
+                const legend = svg.selectAll(".legend").data(color_scale.domain()).enter().append("g")
+                    .attr("class", "legend").attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+                legend.append("rect").attr("x", width - 18)
+                    .attr("width", 18).attr("height", 18).attr("fill", color_scale
+                    );
+
+                legend.append("text")
+                    .attr("x", width - 24).attr("y", 9)
+                    .attr("dy", "5.6px").attr("text-anchor", "end")
+                    .text(d => d);
+
+            } catch (err) {
+                console.error("error loading pca_projection_genres.csv and/or biplot_loadings.csv: ", err);
+            }
+        }
+
+        createBiplot();
+
+        // ======================================================= MDS with Euclidean Distance ======================================================= 
+
+        async function createMDSEuclideanPlot() {
+            try {
+                const data = await d3.csv("mds_euclidean.csv");
+                const width = 800, height = 800;
+                const margin = { top: 50, right: 50, bottom: 50, left: 100 };
+
+                const svg = d3.select("#mds-euclidean").append("svg")
+                    .attr("width", width + margin.left + margin.right).attr("height", height + margin.top + margin.bottom)
+                    .append("g").attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+                // scales
+                const xScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS1)).range([0, width]);
+                const yScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS2)).range([height, 0]);
+
+                // axes x + y
+                svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
+                svg.append("g").call(d3.axisLeft(yScale));
+
+                // plot points
+                svg.selectAll("circle").data(data).enter().append("circle")
+                    .attr("cx", d => xScale(+d.MDS1)).attr("cy", d => yScale(+d.MDS2))
+                    .attr("r", 6).attr("fill", "red").attr("opacity", 0.5);
+
+            } catch (err) {
+                console.error("error loading mds_euclidean.csv : ", err);
+            }
+        }
+
+        createMDSEuclideanPlot();
+
+
+        // ======================================================= MDS with 1 - |Correlation| Distance ======================================================= 
+
+        async function createMDSCorrelationPlot() {
+            try {
+                const data = await d3.csv("mds_correlation.csv");
+                const width = 1000, height = 600, margin = 70;
+                const svg = d3.select("#mds-correlation").append("svg")
+                    .attr("width", width).attr("height", height);
+
+                // scales
+                const xScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS1)).range([margin, width - margin]);
+                const yScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS2)).range([height - margin, margin]);
+
+                // x + y axes
+                svg.append("g").attr("transform", `translate(0, ${height - margin})`)
+                    .call(d3.axisBottom(xScale));
+
+                svg.append("g").attr("transform", `translate(${margin}, 0)`)
+                    .call(d3.axisLeft(yScale));
+
+                // plot vectors (attr arrows)
+                svg.selectAll(".arrow").data(data).enter().append("line")
+                    .attr("x1", xScale(0)).attr("y1", yScale(0))
+                    .attr("x2", d => xScale(+d.MDS1)).attr("y2", d => yScale(+d.MDS2))
+                    .attr("stroke", "black").attr("stroke-width", 2).attr("marker-end", "url(#arrow)");
+
+                // add labels to each vector
+                svg.selectAll(".label").data(data).enter().append("text")
+                    .attr("x", d => xScale(+d.MDS1) + 5).attr("y", d => yScale(+d.MDS2) + 5)
+                    .text(d => d.Attribute).attr("font-size", "12px").attr("fill", "red");
+
+                // same thing from biplot
+                svg.append("defs").append("marker")
+                    .attr("id", "arrow")
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 10)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                    .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", "black");
+
+            } catch (err) {
+                console.error("Error loading MDS Correlation data: ", err);
+            }
+        }
+
+        createMDSCorrelationPlot();
+
+
+    </script>
+</body>
+</html>

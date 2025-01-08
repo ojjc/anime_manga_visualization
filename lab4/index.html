@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSE 332 - Lab 3</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        #section {
+            overflow: auto;
+        }
+        .axis {
+            font: 10px sans-serif;
+        }
+        .dimension {
+            opacity: 0.6;
+        }
+        .dimension:hover {
+            opacity: 1;
+        }
+        #corr-label {
+            font: 12px sans-serif;
+        }
+        .cell {
+            stroke: #fff;
+            stroke-width: 1px;
+        }
+        #correlation-matrix {
+            float: left;
+        }
+        #legend {
+            float: left;
+            margin-top: 15px;
+        }
+        #legend text {
+            font-size: 10px;
+        }
+        #scatter-plot-matrix {
+            display: flex;
+            flex-wrap: wrap;
+        }
+        .scatter-plot {
+            width: 250px;
+            height: 250px;
+        }
+        #explain {
+            color: gray;
+            font-size: 10px;
+        }
+
+        .viz-container {
+            flex: 1 1 45%;
+            margin: 20px;
+        }
+        @media (max-width: 1200px) {
+            .viz-container {
+                flex: 1 1 100%;
+            }
+        }
+        .chart { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin: 10px;
+            background-color: #fff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+    </style>
+    <nav>
+        <a href="index.html">User-Based Coloring</a>
+        <a href="clustering.html">Clustering-Based Coloring</a>
+    </nav>
+      
+</head>
+<body>
+    <h1>Lab 4 - Visual Analytics of Animes and their Respective Mangas (if they have one)</h1>
+    <h2>CSE 332 - Joseph Jeong</h2>
+
+    <!-- BAR CHART / HISTOGRAM -->
+    <div class="section">
+        <h2>Bar Chart (Categorical Variables) / Histogram (Numerical Variables)</h2>
+        <label for="variableSelect">Select a variable:</label>
+        <div id="barButtonContainer" style="display: inline-block;">
+            <select id="variableSelect"></select>
+        </div>
+        <div class="visualizations">
+            <div id="barChart" class="chart viz-container"></div>
+            <div id="histogram" class="chart viz-container"></div>
+        </div>
+
+        <div class="genreInfoBar">
+            The Anime Genre datapoints were separated by commas with up to 3 different genres that could be interpreted as such:
+            the primary genre, the secondary, and the tertiary. The first chart represents the distribution of "primary" genres.
+            There is also an option to view the secondary genres as well. The tertiary option is not displayed because the datapoints
+            do not always have three genres.
+        </div>
+    </div>
+        
+    <div id="section">
+        <h2>Parallel Coordinates Display</h2>
+        <div id="parallel-coordinates"></div>
+        <h3 id=explain>using only top 1000 ranked anime from now on to make data visualization simpler to see and understand</h3>
+    </div>
+        
+    <div id="section">
+        <h2>Biplot</h2>
+        <div id="biplot"></div>
+    </div>
+        
+    <div id="section">
+        <h2>MDS with Euclidean Distance</h2>
+        <div id="mds-euclidean"></div>
+    </div>
+    
+    <script>  
+
+//  ======================================================= HISTOGRAM AND BAR CHART CHART =======================================================
+
+
+        async function createHistOrBar() {
+            try {
+                const data = await d3.csv("numerical_animanga.csv");
+
+                const num_vars = [
+                    "Anime_Score", "Anime_Rank", "Anime_Popularity", "Anime_Members",
+                    "Manga_Score", "Manga_Rank", "Manga_Popularity", "Manga_Members"
+                ];
+                const cat_vars = ['Genres', 'Stream_type'];
+                const allVars = cat_vars.concat(num_vars);
+
+                // filtering and cleaning data
+                const cleanedData = data.filter(d => {
+                    return d.Manga !== "" &&
+                        num_vars.every(varName => d[varName] !== "") &&
+                        cat_vars.every(varName => {
+                            if (varName === 'Manga_Demographics') return d[varName] !== "[]"; 
+                            return d[varName] !== "" && d[varName] !== null;
+                        });
+                }).map(d => {
+                    num_vars.forEach(varName => {
+                        if (varName === 'Anime_Members') {
+                            // cleaning based on regex
+                            d[varName] = +d[varName].replace(/[\s,]+/g, ""); 
+                        } else {
+                            // converting to int
+                            d[varName] = +d[varName];
+                        }
+                    });
+                    return d;
+                });
+
+                // color scale and selection variable
+                const colorScale = d3.scaleOrdinal(d3.schemeCategory10);
+                // storing selected "values" and colors
+                const selected = new Map(); 
+
+                // utility fn for range keys
+                function getRangeKey(range) {
+                    return JSON.stringify(range);
+                }
+
+                // populate dropdown menu
+                const variableSelect = d3.select("#variableSelect");
+                allVars.forEach(varName => {
+                    variableSelect.append("option")
+                        .attr("value", varName)
+                        .text(varName);
+                });
+
+                // initial viz
+                const initialVar = allVars[0];
+                updateBarChart(initialVar);
+                updateHistogram(initialVar);
+
+                variableSelect.on("change", function () {
+                    const selectedVar = d3.select(this).property("value");
+                    updateBarChart(selectedVar, "primary");
+                    updateHistogram(selectedVar);
+                });
+
+                // reset function to reset colors and make map empty
+                function resetSelections() {
+                    selected.clear(); 
+                    d3.selectAll(".bar").attr("fill", "lightgrey"); 
+                    d3.selectAll(".line").style("stroke", "lightgrey").style("opacity", 0.7); 
+                    if (window.updateParallelCoordinates) {
+                        window.updateParallelCoordinates(null, selected); 
+                        window.updateBiplotColors(null, selected);
+                        window.updateMDSEuclideanColors(null, selected);
+                        console.log("Selected Ranges:", Array.from(selected.entries()));
+                    }
+                }
+
+                // reset button
+                d3.select("#barButtonContainer")
+                    .append("button")
+                    .text("Reset Selections")
+                    .on("click", resetSelections);
+
+                // update BAR CHART
+                function updateBarChart(variable, genreType = "primary") {
+                    const containerId = genreType === "primary" ? "#barChart" : "#secondaryBarChart";
+                    d3.select(containerId).html(""); 
+
+                    if (!cat_vars.includes(variable)) {
+                        d3.select(containerId).append("p").text("Selected variable is not categorical.");
+                        return;
+                    }
+
+                    // dimensions
+                    const width = 800, height = 500, margin = { top: 20, right: 20, bottom: 100, left: 80 };
+                    const svg = d3.select(containerId)
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .append("g")
+                        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    const chartWidth = width - margin.left - margin.right;
+                    const chartHeight = height - margin.top - margin.bottom;
+
+                    // computing counts
+                    const counts = d3.rollups(
+                        cleanedData,
+                        v => v.length,
+                        d => {
+                            if (variable === "Genres") {
+                                const genres = d[variable].split(",");
+                                return genreType === "primary" ? genres[0].trim() : genres[1]?.trim() || "No Secondary Genre";
+                            }
+                            return d[variable];
+                        }
+                    ).sort((a, b) => b[1] - a[1]);
+
+                    const x = d3.scaleBand()
+                        .domain(counts.map(d => d[0]))
+                        .range([0, chartWidth])
+                        .padding(0.1);
+
+                    const y = d3.scaleLinear()
+                        .domain([0, d3.max(counts, d => d[1])])
+                        .nice()
+                        .range([chartHeight, 0]);
+
+                    const xAxis = d3.axisBottom(x);
+                    const yAxis = d3.axisLeft(y).ticks(10);
+
+                    // x-axis
+                    svg.append("g")
+                        .attr("transform", `translate(0,${chartHeight})`)
+                        .call(xAxis)
+                        .selectAll("text")
+                        .attr("transform", "rotate(-45)")
+                        .style("text-anchor", "end");
+
+                    // y-axis
+                    svg.append("g").call(yAxis);
+
+                    // bars
+                    svg.selectAll(".bar")
+                        .data(counts)
+                        .enter()
+                        .append("rect")
+                        .attr("class", "bar")
+                        .attr("x", d => x(d[0]))
+                        .attr("width", x.bandwidth())
+                        .attr("y", d => y(d[1]))
+                        .attr("height", d => chartHeight - y(d[1]))
+                        .attr("fill", d => selected.has(d[0]) ? selected.get(d[0]) : "lightgrey")
+                        .on("click", (event, d) => {
+                            if (!selected.has(d[0])) {
+                                const assignedColor = colorScale(selected.size);
+                                selected.set(d[0], assignedColor);
+                                d3.select(event.target).attr("fill", assignedColor);
+                            } else {
+                                selected.delete(d[0]);
+                                d3.select(event.target).attr("fill", "lightgrey");
+                            }
+
+                            // updating pc, biplot, mds plot (categorical values)
+                            if (window.updateParallelCoordinates && window.updateBiplotColors && window.updateMDSEuclideanColors) {
+                                console.log('histogram: pc, biplot, mds plot colored!!!!!!!!!!!!');
+                                window.updateParallelCoordinates(variable, selected);
+                                window.updateBiplotColors(variable, selected);
+                                window.updateMDSEuclideanColors(variable, selected);
+                            }
+
+                            console.log("selected levels:", Array.from(selected.entries()));
+                        });
+                }
+
+                // update histogram function
+                function updateHistogram(variable) {
+                    d3.select("#histogram").html("");
+
+                    if (!num_vars.includes(variable)) {
+                        d3.select("#histogram").append("p").text("Selected variable is not numerical.");
+                        return;
+                    }
+
+                    const width = 700, height = 500, margin = { top: 20, right: 20, bottom: 80, left: 80 };
+                    const svg = d3.select("#histogram")
+                        .append("svg")
+                        .attr("width", width)
+                        .attr("height", height)
+                        .append("g")
+                        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    const chartWidth = width - margin.left - margin.right;
+                    const chartHeight = height - margin.top - margin.bottom;
+
+                    const values = cleanedData.map(d => d[variable]);
+                    const bins = d3.bin().thresholds(20)(values);
+
+                    const x = d3.scaleLinear()
+                        .domain([d3.min(values), d3.max(values)])
+                        .range([0, chartWidth])
+                        .nice();
+
+                    const y = d3.scaleLinear()
+                        .domain([0, d3.max(bins, d => d.length)])
+                        .range([chartHeight, 0]);
+
+                    const xAxis = d3.axisBottom(x);
+                    const yAxis = d3.axisLeft(y).ticks(10);
+
+                    svg.append("g")
+                        .attr("transform", `translate(0,${chartHeight})`)
+                        .call(xAxis);
+
+                    svg.append("g").call(yAxis);
+
+                    svg.selectAll(".bar")
+                        .data(bins)
+                        .enter()
+                        .append("rect")
+                        .attr("class", "bar")
+                        .attr("x", d => x(d.x0))
+                        .attr("width", d => x(d.x1) - x(d.x0) - 1)
+                        .attr("y", d => y(d.length))
+                        .attr("height", d => chartHeight - y(d.length))
+                        .attr("fill", "lightgrey")
+                        .on("click", (event, d) => {
+                            const range = { min: d.x0, max: d.x1 }; // storing range
+                            const key = getRangeKey(range); // convert range to a consistent key
+                            if (!selected.has(key)) {
+                                const assignedColor = colorScale(selected.size);
+                                selected.set(key, assignedColor);
+                                d3.select(event.target).attr("fill", assignedColor);
+                            } else {
+                                selected.delete(key);
+                                d3.select(event.target).attr("fill", "lightgrey");
+                            }
+
+                            // updating pc, biplot, mds plot (numerical values)
+                            if (window.updateParallelCoordinates && window.updateBiplotColors && window.updateMDSEuclideanColors) {
+                                console.log('bar chart: pc, biplot, mds plot colored!!!!!!!!!!!!');
+                                window.updateParallelCoordinates(variable, selected);
+                                window.updateBiplotColors(variable, selected);
+                                window.updateMDSEuclideanColors(variable, selected);
+                            }
+
+                            console.log("selected ranges:", Array.from(selected.entries()));
+                        });
+                }
+            } catch (error) {
+                console.error("error loading or processing data:", error);
+            }
+        }
+
+        createHistOrBar();
+
+
+//  ======================================================= PARALLEL COORDINATES CHART =======================================================
+         
+        async function createParallelCoordinatesChart() {
+            try {
+                const data = await d3.csv("numerical_animanga.csv");
+
+                const num_vars = [
+                    "Anime_Score", "Anime_Rank", "Manga_Score", "Manga_Rank",
+                    "Manga_Members", "Anime_Members", "Anime_Popularity",
+                    "Manga_Popularity"
+                ];
+                const cat_vars = ["Genres", "Stream_type"];
+
+                const topGenres = [
+                    "Action", "Comedy", "Drama", "Adventure", "Fantasy",
+                    "Mystery", "Horror", "Slice of Life", "Romance"
+                ];
+
+                // dimensions
+                const margin = { top: 60, right: 20, bottom: 30, left: 40 };
+                const width = 1200 - margin.left - margin.right;
+                const height = 600 - margin.top - margin.bottom;
+
+                const svg = d3.select("#parallel-coordinates").append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                const columns = [...num_vars, ...cat_vars];
+
+                // assign "Other" for genres outside the topGenres
+                data.forEach(d => {
+                    const firstGenre = d.Genres.split(",")[0].trim();
+                    d.Genres = topGenres.includes(firstGenre) ? firstGenre : "Other";
+                });
+
+                // scaling for each columns
+                const y = {};
+                columns.forEach(column => {
+                    if (cat_vars.includes(column)) {
+                        y[column] = d3.scalePoint()
+                            .domain([...new Set(data.map(d => d[column]))].sort())
+                            .range([height, 0]);
+                    } else {
+                        y[column] = d3.scaleLinear()
+                            .domain(d3.extent(data, d => +d[column]))
+                            .range([height, 0]);
+                    }
+                });
+
+                const x = d3.scalePoint().range([0, width]).padding(1).domain(columns);
+
+                // draw lines (paths) with default coloring
+                const lines = svg.append("g").selectAll(".line")
+                    .data(data)
+                    .enter()
+                    .append("path")
+                    .attr("class", "line")
+                    .attr("d", d => d3.line()(columns.map(p => [x(p), y[p](d[p])])))
+                    .style("fill", "none")
+                    .style("stroke", "lightgray") // default is light gray
+                    .style("stroke-width", 1.5)
+                    .style("opacity", 0.7);
+
+                // function to update line colors based on bar chart or histogram selections
+                function updateLineColors(selectedVariable, selected) {
+                    lines.transition()
+                        .duration(500)
+                        .style("stroke", d => {
+                            // handling categorical variables
+                            if (cat_vars.includes(selectedVariable) && selected.has(d[selectedVariable])) {
+                                return selected.get(d[selectedVariable]);
+                            }
+
+                            // handle numerical variables by checking ranges
+                            if (num_vars.includes(selectedVariable)) {
+                                for (let [key, color] of selected.entries()) {
+                                    // converting key back to range object
+                                    const range = JSON.parse(key); 
+                                    if (+d[selectedVariable] >= range.min && +d[selectedVariable] < range.max) {
+                                        return color;
+                                    }
+                                }
+                            }
+
+                            // default color for unselected lines
+                            return "lightgray"; 
+                        });
+                }
+
+                // draw axes for each column
+                const axis = svg.selectAll(".dimension")
+                    .data(columns)
+                    .enter()
+                    .append("g")
+                    .attr("class", "dimension")
+                    .attr("transform", d => `translate(${x(d)})`);
+
+                axis.append("g").each(function(d) {
+                    d3.select(this).call(d3.axisLeft(y[d]));
+                });
+
+                axis.append("text")
+                    .attr("fill", "black")
+                    .attr("y", -10)
+                    .attr("text-anchor", "middle")
+                    .attr("x", 0)
+                    .text(d => d)
+                    .style("font-size", "12px");
+
+                // GLOBAL function to trigger updates (actually saved me)
+                window.updateParallelCoordinates = (selectedVariable, selected) => {
+                    updateLineColors(selectedVariable, selected);
+                };
+
+            } catch (error) {
+                console.error("error loading data for parallel coordinates chart.........", error);
+            }
+        }
+
+        createParallelCoordinatesChart();
+
+
+// ======================================================= BIPLOT PLOT ======================================================= 
+
+        async function createBiplot() {
+            try {
+                const proj = await d3.csv('pca_projection_genres_stream.csv');
+                const loadings = await d3.csv('biplot_loadings.csv');
+
+                const width = 600, height = 600, margin = 50;
+
+                const num_vars = [
+                    "Anime_Score", "Anime_Rank", "Manga_Score", "Manga_Rank",
+                    "Manga_Members", "Anime_Members", "Anime_Popularity",
+                    "Manga_Popularity"
+                ];
+                const cat_vars = ["Genres", "Stream_type"];
+
+                const svg = d3.select("#biplot").append("svg")
+                    .attr("width", width).attr("height", height);
+
+                // x and y scales for PCA and biplot
+                const xScale = d3.scaleLinear().domain(d3.extent(proj, d => +d.PC1)).range([margin, width - margin]);
+                const yScale = d3.scaleLinear().domain(d3.extent(proj, d => +d.PC2)).range([height - margin, margin]);
+
+                // add x and y axes
+                svg.append("g").attr("transform", `translate(0, ${height - margin})`).call(d3.axisBottom(xScale));
+                svg.append("g").attr("transform", `translate(${margin}, 0)`).call(d3.axisLeft(yScale));
+
+                // add PCA points
+                const points = svg.selectAll("circle")
+                    .data(proj)
+                    .enter()
+                    .append("circle")
+                    .attr("cx", d => xScale(+d.PC1))
+                    .attr("cy", d => yScale(+d.PC2))
+                    .attr("r", 4)
+                    .attr("fill", "lightgray") //default
+                    .attr("opacity", 0.7);
+
+                // add biplot loadings (arrows)
+                svg.selectAll(".arrow")
+                    .data(loadings)
+                    .enter()
+                    .append("line")
+                    .attr("x1", xScale(0))
+                    .attr("y1", yScale(0))
+                    .attr("x2", d => xScale(+d.PC1_loading * 5))
+                    .attr("y2", d => yScale(+d.PC2_loading * 5))
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 2)
+                    .attr("marker-end", "url(#arrow)");
+
+                // add biplot labels
+                svg.selectAll(".label")
+                    .data(loadings)
+                    .enter()
+                    .append("text")
+                    .attr("x", d => xScale(+d.PC1_loading * 5) + 5)
+                    .attr("y", d => yScale(+d.PC2_loading * 5) + 5)
+                    .text(d => d.Attribute)
+                    .attr("fill", "red")
+                    .attr("font-size", "12px");
+
+                // add axis labels
+                svg.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", height - 10)
+                    .attr("text-anchor", "middle")
+                    .text("PC1");
+                svg.append("text")
+                    .attr("x", -height / 2)
+                    .attr("y", 15)
+                    .attr("transform", "rotate(-90)")
+                    .attr("text-anchor", "middle")
+                    .text("PC2");
+
+                // add marker definition for arrows
+                svg.append("defs").append("marker")
+                    .attr("id", "arrow")
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 10)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                    .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", "black");
+
+                function updatePointColors(selectedVariable, selected) {
+                    console.log(selectedVariable);
+                    points.transition()
+                        .duration(500)
+                        .attr("fill", d => {
+                            // handle categorical variables
+                            if (cat_vars.includes(selectedVariable) && selected.has(d[selectedVariable])) {
+                                return selected.get(d[selectedVariable]);
+                            }
+
+                            // handle numerical variables by checking ranges
+                            if (num_vars.includes(selectedVariable)) {
+                                for (let [key, color] of selected.entries()) {
+                                    const range = JSON.parse(key);
+                                    if (+d[selectedVariable] >= range.min && +d[selectedVariable] < range.max) {
+                                        return color;
+                                    }
+                                }
+                            }
+                            return "lightgray"; // default colors
+                        });
+                }
+
+                window.updateBiplotColors = (selectedVariable, selectedValue) => {
+                    updatePointColors(selectedVariable, selectedValue);
+                };
+
+            } catch (err) {
+                console.error("error loading PCA or biplot data: ", err);
+            }
+        }
+
+        createBiplot();
+
+// ======================================================= MDS with Euclidean Distance ======================================================= 
+
+        async function createMDSEuclideanPlot() {
+            try {
+
+                const num_vars = [
+                    "Anime_Score", "Anime_Rank", "Manga_Score", "Manga_Rank",
+                    "Manga_Members", "Anime_Members", "Anime_Popularity",
+                    "Manga_Popularity"
+                ];
+                const cat_vars = ["Genres", "Stream_type"];
+
+                const data = await d3.csv("mds_euclidean_with_categories.csv");
+                const width = 800, height = 800;
+                const margin = { top: 50, right: 50, bottom: 50, left: 100 };
+
+                const svg = d3.select("#mds-euclidean").append("svg")
+                    .attr("width", width + margin.left + margin.right)
+                    .attr("height", height + margin.top + margin.bottom)
+                    .append("g")
+                    .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+                // scales
+                const xScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS1)).range([0, width]);
+                const yScale = d3.scaleLinear()
+                    .domain(d3.extent(data, d => +d.MDS2)).range([height, 0]);
+
+                // axes
+                svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
+                svg.append("g").call(d3.axisLeft(yScale));
+
+                // plot points
+                const points = svg.selectAll("circle").data(data).enter().append("circle")
+                    .attr("cx", d => xScale(+d.MDS1))
+                    .attr("cy", d => yScale(+d.MDS2))
+                    .attr("r", 6)
+                    .attr("fill", "lightgray") //default color
+                    .attr("opacity", 0.5);
+
+                // // update point colors dynamically
+                // function updatePointColors(selectedVariable, selected) {
+                //     points.transition()
+                //         .duration(500)
+                //         .attr("fill", d => {
+                //             // Match categorical variables
+                //             if (selected.has(d[selectedVariable])) {
+                //                 return selected.get(d[selectedVariable]);
+                //             }
+                //             return "lightgray"; 
+                //         });
+                // }
+
+                function updatePointColors(selectedVariable, selected) {
+                    console.log(selectedVariable);
+                    points.transition()
+                        .duration(500)
+                        .attr("fill", d => {
+                            // categorical variables
+                            if (cat_vars.includes(selectedVariable) && selected.has(d[selectedVariable])) {
+                                return selected.get(d[selectedVariable]);
+                            }
+
+                            // num vars
+                            if (num_vars.includes(selectedVariable)) {
+                                for (let [key, color] of selected.entries()) {
+                                    const range = JSON.parse(key); 
+                                    if (+d[selectedVariable] >= range.min && +d[selectedVariable] < range.max) {
+                                        return color;
+                                    }
+                                }
+                            }
+                            return "lightgray"; //default
+                        });
+                }
+
+                // GLOBAL
+                window.updateMDSEuclideanColors = (selectedVariable, selected) => {
+                    updatePointColors(selectedVariable, selected);
+                };
+            } catch (err) {
+                console.error("error loading mds_euclidean_with_categories.csv: ", err);
+            }
+        }
+
+        createMDSEuclideanPlot();
+
+
+    </script>
+</body>
+</html>

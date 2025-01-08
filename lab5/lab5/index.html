@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>CSE 332 - Lab 5</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        .viz-ex {
+            font-size: 14px; 
+            font-weight: 300; 
+            color: #ffffff; 
+            background: linear-gradient(90deg, #444, #1f1f1f); 
+            padding: 10px ;
+            border-radius: 8px; 
+            display: inline-flex; 
+            align-items: center; 
+            gap: 10px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); 
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        .outer{
+            background-color: white;
+        }
+
+        .dashboard {
+            background-color: #1F2021; 
+            color: white; 
+            margin: 20px;
+        }
+
+        .dashboard text {
+            fill: white;
+        }
+
+        .axis text {
+            fill: white;
+        }
+
+        .tooltip {
+            background-color: white;
+            color: black;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            padding: 5px;
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .button-container button {
+            background-color: #333;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 5px;
+            cursor: pointer;
+            border-radius: 5px; 
+
+        }
+
+        .button-container button:hover {
+            background-color: #555;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: flex-start;
+            align-items: center; 
+            gap: 15px;
+            margin-bottom: 10px; 
+        }
+
+        .controls label {
+            font-size: 14px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .controls select {
+            background-color: #333; 
+            color: white; 
+            border: 1px solid #555; 
+            border-radius: 5px; 
+            padding: 4px; 
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .controls select:hover {
+            background-color: #444;
+        }
+
+        .controls select:focus {
+            outline: none; 
+            box-shadow: 0 0 5px #888; 
+        }
+
+        .reset-dashboard-btn {
+            background-color: #444; 
+            color: white;
+            border: none; 
+            padding: 5px 7px; 
+            margin: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 5px; 
+        }
+
+        .reset-dashboard-btn:hover {
+            background-color: #666;
+        }
+
+        .dashboard {
+            display: grid;
+            /* top bar, first row, and second row */
+            grid-template-rows: 40px auto auto;
+            /* scatter plot, pca plot, bar chart */
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-areas:
+                "top-bar top-bar top-bar"
+                "scatter-plot pca-plot bar-chart"
+                "area-chart area-chart bar-chart";
+            gap: 3px; 
+            box-sizing: border-box;
+            margin: 0 100px 100px 100px ;
+            border-radius: 15px; 
+            overflow: hidden;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
+        .top-bar {
+            grid-area: top-bar;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background-color: #dfdfdf;
+            color: rgb(0, 0, 0);
+            font-size: 14px;
+        }
+
+        .scatter-plot {
+            grid-area: scatter-plot;
+            /* border: 2px solid black;  */
+            align-items: center;
+            justify-content: center;
+            background-color: #242424;
+            padding-left: 30px;
+            margin-left: 30px;
+            margin-right: 15px;
+        }
+
+        .pca-plot {
+            grid-area: pca-plot;
+            /* border: 2px solid black; */
+            /* display: flex; */
+            align-items: center;
+            justify-content: center;
+            background-color: #242424;
+            margin-left: 15px;
+            margin-right: 30px;
+            padding-left: 30px;
+        }
+
+        .bar-chart {
+            grid-area: bar-chart;
+            /* border: 2px solid black; */
+            /* display: flex; */
+            align-items: center;
+            justify-content: center;
+            background-color: #242424;
+            padding-left: 50px
+        }
+
+
+        .area-chart {
+            grid-area: area-chart;
+            /* display: flex; */
+            background-color: #242424;
+            flex-direction: row;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 10px; 
+            /* border: 2px solid black;  */
+        }
+
+        .bar-chart, .scatter-plot, .pca-plot, .area-chart {
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #timechart .button-container {
+            display: flex;
+            flex-direction: column; 
+            gap: 10px;
+        }
+
+        #timechart {
+            flex-grow: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center; 
+        }
+
+        .title {
+            text-align: center;
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: white; 
+        }
+       
+    </style>
+      
+</head>
+<body>
+    <div class="outer">
+        <div class="dashboard">
+            <div class="top-bar">
+                <p class="viz-ex">
+                    <img src="cat.png" alt="Icon" style="width: 24px; height: 24px;">
+                    Visualizations of Anime and their Mangas
+                </p>
+                <div class="reset-button"></div>
+            </div>
+
+
+            <div class="bar-chart">
+                <p class="title">Bar Chart</p>
+                <div id="chart"></div>
+            </div>
+                
+            <div class="scatter-plot">
+                <p class="title">Scatterplot</p>
+                <div id="splot"></div>
+            </div>
+                
+            <div class="area-chart">
+                <p class="title">Time Series Area Chart</p>
+                <div id="timechart"></div>
+            </div>
+                
+            <div class="pca-plot">
+                <p class="title">PCA Plot</p>
+                <div id="pplot"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>  
+
+        async function dashboard() {
+            try {
+
+                // reload page when clicked
+                function addResetButton() {
+                    const resetButton = d3.select(".reset-button")
+                        .append("button")
+                        .text("Reset Dashboard")
+                        .attr("class", "reset-dashboard-btn")
+                        .on("click", () => location.reload()); 
+                }
+
+                // 18 colors given by ChatGPT
+                const colorScale = [
+                    "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+                    "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf",
+                    "#393b79", "#637939", "#8c6d31", "#843c39", "#7b4173",
+                    "#3182bd", "#6baed6", "#9edae5"
+                ];
+
+                let selectedGenres = [];
+                let currentMode = "all"; 
+
+                function updateVisualizations() {
+                    d3.selectAll(".point").attr("fill", d => {
+                        if (selectedGenres.length === 0) return "grey";
+                        const matched = selectedGenres.some(sg => d[currentMode] === sg.genre);
+                        return matched ? selectedGenres.find(sg => d[currentMode] === sg.genre).color : "grey";
+                    });
+                }
+
+                // brushing "selection"
+                const selection = new Set();
+
+                // brushing on either PCA plot or Scatter plot
+                function updateSelection(data, extent, source) {
+                    selection.clear();
+
+                    data.forEach(d => {
+                        if (isBrushed(extent, d[source === "PCA" ? "PC1" : xAttribute], d[source === "PCA" ? "PC2" : yAttribute])) {
+                            selection.add(d.Title);
+                        }
+                    });
+
+                    updatePlots();
+                }
+
+                function resetSelection(source) {
+                    selection.clear();
+                    updatePlots();
+                }
+
+                function updatePlots() {
+                    // highlight points in both plots based on the selection
+                    d3.selectAll(".point")
+                        .classed("selected", d => selection.has(d.Title));
+                }
+
+                // based on https://peterbeshai.com/blog/2016-12-03-brushing-in-scatterplots-with-d3-and-quadtrees/
+                // and https://observablehq.com/@d3/brushable-scatterplot-matrix
+                function isBrushed(brushExtent, cx, cy) {
+                    return brushExtent[0][0] <= cx && cx <= brushExtent[1][0] &&
+                        brushExtent[0][1] <= cy && cy <= brushExtent[1][1];
+                }
+
+                // highlighting bar in barchart based on brushing in splot() or pca()
+                function highlightBarChart(selectedGenres) {
+                    const isHighlighting = selectedGenres.size > 0;
+
+                    d3.select(".bar-chart #chart")
+                        .selectAll(".bar")
+                        .transition()
+                        .duration(25)
+                        .attr("fill", d => {
+                            return isHighlighting && selectedGenres.has(d.genre) ? "red" : "grey";
+                        })
+                        .attr("opacity", d => (isHighlighting && selectedGenres.has(d.genre) ? 0.5 : 0.2));
+                }
+
+                // go back to default colors if no brushing involved
+                function resetBarChartColors() {
+                    d3.select(".bar-chart #chart")
+                        .selectAll(".bar")
+                        .attr("fill", (d, i) => colorScale[i % colorScale.length])
+                        .attr("opacity", 1); 
+                }
+
+                // bar chart!!!!!
+                function barChart() {
+                    const margin = { top: 20, right: 20, bottom: 40, left: 150 };
+                    const width = 500 - margin.left - margin.right;
+                    const height = 800 - margin.top - margin.bottom;
+
+                    const svg = d3.select(".bar-chart #chart")
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", `translate(100,${margin.top})`);
+
+                    // using tooltip from my lab2
+                    const tooltip = d3.select(".dashboard")
+                        .append("div")
+                        .attr("class", "tooltip")
+                        .style("position", "absolute")
+                        .style("background", "lightgrey")
+                        .style("color", "black")
+                        .style("border", "1px solid #ccc")
+                        .style("border-radius", "5px")
+                        .style("padding", "5px")
+                        .style("pointer-events", "none")
+                        .style("opacity", 0);
+
+                    const buttonContainer = d3.select("#chart")
+                        .append("div")
+                        .attr("class", "button-container");
+
+                    const buttons = [
+                        { label: "All Genres", value: "all" },
+                        { label: "Primary Genre", value: "Genre_1" },
+                        { label: "Secondary Genre", value: "Genre_2" },
+                        { label: "Tertiary Genre", value: "Genre_3" }
+                    ];
+
+                    buttons.forEach(button => {
+                        buttonContainer.append("button")
+                            .text(button.label)
+                            .attr("class", "button")
+                            .on("click", () => updateChart(button.value));
+                    });
+
+                    let allGenres = {}; 
+
+                    d3.csv("real_animanga.csv").then(data => {
+                        allGenres = {
+                            all: [],
+                            Genre_1: [],
+                            Genre_2: [],
+                            Genre_3: []
+                        };
+
+                        data.forEach(d => {
+                            if (d.Genre_1) allGenres.Genre_1.push(d.Genre_1.trim());
+                            if (d.Genre_2) allGenres.Genre_2.push(d.Genre_2.trim());
+                            if (d.Genre_3) allGenres.Genre_3.push(d.Genre_3.trim());
+
+                            // combining all genres to one
+                            if (d.Genre_1) allGenres.all.push(d.Genre_1.trim());
+                            if (d.Genre_2) allGenres.all.push(d.Genre_2.trim());
+                            if (d.Genre_3) allGenres.all.push(d.Genre_3.trim());
+                        });
+
+                        updateChart("all");
+                    });
+
+                    function updateChart(filterType) {
+                        currentMode = filterType;
+                        const filteredGenres = allGenres[filterType];
+                        const genreCounts = d3.rollup(
+                            filteredGenres,
+                            v => v.length,
+                            d => d
+                        );
+
+                        const genreData = Array.from(genreCounts, ([genre, count]) => ({ genre, count }))
+                            .sort((a, b) => b.count - a.count);
+
+                        const yScale = d3.scaleBand()
+                            .domain(genreData.map(d => d.genre))
+                            .range([0, height])
+                            .padding(0.1);
+
+                        const xScale = d3.scaleLinear()
+                            .domain([0, d3.max(genreData, d => d.count)])
+                            .range([0, width]);
+
+                        if (filterType !== "all") {
+                            d3.select(".bar-chart #chart")
+                                .selectAll(".bar")
+                                .attr("fill", (d, i) => colorScale[i % colorScale.length])
+                                .attr("opacity", 1);
+                        }
+
+                        const bars = svg.selectAll(".bar")
+                            .data(genreData, d => d.genre);
+
+                        bars.enter()
+                            .append("rect")
+                            .attr("class", "bar")
+                            .attr("y", d => yScale(d.genre))
+                            .attr("height", yScale.bandwidth())
+                            .attr("x", 0)
+                            .attr("width", 0) // transition ? :3
+                            .attr("fill", (d, i) => colorScale[i % colorScale.length])
+                            .merge(bars) // merge enter and update
+                            .on("mouseover", function (event, d) {
+                                tooltip.transition().duration(200).style("opacity", 1);
+                                tooltip.html(`<strong>${d.genre}</strong>: ${d.count}`)
+                                    .style("left", `${event.pageX + 10}px`)
+                                    .style("top", `${event.pageY - 20}px`);
+                            })
+                            .on("mousemove", function (event) {
+                                tooltip.style("left", `${event.pageX + 10}px`)
+                                    .style("top", `${event.pageY - 20}px`);
+                            })
+                            .on("mouseout", function () {
+                                tooltip.transition().duration(200).style("opacity", 0);
+                            })
+                            .transition()
+                            .duration(750)
+                            .attr("y", d => yScale(d.genre))
+                            .attr("height", yScale.bandwidth())
+                            .attr("width", d => xScale(d.count));
+
+                        bars.on("click", (event, d) => {
+                            // do nothing in "all" mode
+                            if (currentMode === "all") return; 
+
+                            const index = selectedGenres.findIndex(g => g.genre === d.genre);
+                            if (index !== -1) {
+                                // deselecting already chosen genre
+                                selectedGenres.splice(index, 1);
+                                 // grey out deselected bar
+                                d3.select(event.currentTarget).attr("fill", "grey");
+
+                                // if no genres are selected, reset all bars to their default colors
+                                if (selectedGenres.length === 0) {
+                                    svg.selectAll(".bar").attr("fill", (bar, i) => colorScale[i % colorScale.length]);
+                                } else {
+                                    // grey out non-selected bars
+                                    svg.selectAll(".bar").attr("fill", bar =>
+                                        selectedGenres.some(sg => sg.genre === bar.genre)
+                                            ? selectedGenres.find(sg => sg.genre === bar.genre).color
+                                            : "grey"
+                                    );
+                                }
+                            } else {
+                                // genre not selected, select it
+                                selectedGenres.push({ genre: d.genre, color: colorScale[selectedGenres.length % colorScale.length] });
+                                d3.select(event.currentTarget).attr("fill", selectedGenres[selectedGenres.length - 1].color);
+
+                                // grey out all non-selected bars
+                                svg.selectAll(".bar").attr("fill", bar =>
+                                    selectedGenres.some(sg => sg.genre === bar.genre)
+                                        ? selectedGenres.find(sg => sg.genre === bar.genre).color
+                                        : "grey"
+                                );
+                            }
+
+                            if (selectedGenres.length === 0) location.reload();
+                            updateVisualizations();
+                        });
+
+                        bars.exit()
+                            .transition()
+                            .duration(500)
+                            .attr("width", 0)
+                            .remove();
+
+                        const yAxis = svg.selectAll(".y-axis")
+                            .data([0]);
+
+                        // changing "all" to "genre_1" or "genre_2" or "genre_3" (or vice versa, u get the gist)
+                        yAxis.enter()
+                            .append("g")
+                            .attr("class", "y-axis")
+                            .merge(yAxis)
+                            .transition()
+                            .duration(750)
+                            .call(d3.axisLeft(yScale));
+
+                        const xAxis = svg.selectAll(".x-axis")
+                            .data([0]);
+
+                        // changing count
+                        xAxis.enter()
+                            .append("g")
+                            .attr("class", "x-axis")
+                            .attr("transform", `translate(0,${height})`)
+                            .merge(xAxis)
+                            .transition()
+                            .duration(750)
+                            .call(d3.axisBottom(xScale).ticks(10));
+
+                        svg.selectAll(".x-axis-label").remove();
+                        svg.selectAll(".y-axis-label").remove();
+
+                        svg.append("text")
+                            .attr("class", "x-axis-label")
+                            .attr("x", width / 2)
+                            .attr("y", height + margin.bottom - 5)
+                            .attr("text-anchor", "middle")
+                            .text("Counts");
+
+                        svg.append("text")
+                            .attr("class", "y-axis-label")
+                            .attr("x", -height / 2)
+                            .attr("y", -margin.left + 60)
+                            .attr("text-anchor", "start")
+                            .attr("transform", "rotate(-90)")
+                            .text("Genres");
+                    }
+                }
+
+                const selectedPoints = new Set();
+
+                // brushing highlights bars and points brushed (and selected) to red
+                function updatePlots() {
+                    const isSelected = selectedPoints.size > 0;
+
+                    d3.select(".pca-plot #pplot")
+                        .selectAll(".point")
+                        .attr("fill", d => (isSelected && selectedPoints.has(d.Title)) ? "red" : "grey")
+                        .attr("opacity", d => (isSelected && selectedPoints.has(d.Title)) ? 1 : 0.3)
+                        .attr("r", d => (isSelected && selectedPoints.has(d.Title)) ? 5 : 2);
+
+                    d3.select(".scatter-plot #splot")
+                        .selectAll(".point")
+                        .attr("fill", d => (isSelected && selectedPoints.has(d.Title)) ? "red" : "grey")
+                        .attr("opacity", d => (isSelected && selectedPoints.has(d.Title)) ? 1 : 0.3)
+                        .attr("r", d => (isSelected && selectedPoints.has(d.Title)) ? 5 : 2);
+
+                    // update bar chart with color!!!
+                    if (currentMode === "all") {
+                        const selectedGenres = new Set();
+                        d3.selectAll(".point").each(d => {
+                            if (selectedPoints.has(d.Title)) {
+                                if (d.Genre_1) selectedGenres.add(d.Genre_1);
+                                if (d.Genre_2) selectedGenres.add(d.Genre_2);
+                                if (d.Genre_3) selectedGenres.add(d.Genre_3);
+                            }
+                        });
+
+                        if (selectedGenres.size > 0) {
+                            highlightBarChart(selectedGenres);
+                        } else {
+                            resetBarChartColors();
+                        }
+                    }
+                }
+
+
+                // pca plot
+                function pca() {
+                    const margin = { top: 20, right: 20, bottom: 50, left: 50 };
+                    const width = 450 - margin.left - margin.right;
+                    const height = 375 - margin.top - margin.bottom;
+
+                    const svg = d3.select(".pca-plot #pplot")
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    const tooltip = d3.select(".dashboard")
+                        .append("div")
+                        .attr("class", "tooltip")
+                        .style("position", "absolute")
+                        .style("background", "lightgrey")
+                        .style("color", "black")
+                        .style("border", "1px solid #ccc")
+                        .style("border-radius", "5px")
+                        .style("padding", "5px")
+                        .style("pointer-events", "none")
+                        .style("opacity", 0);
+
+                    d3.csv("pca.csv").then(data => {
+                        data.forEach(d => {
+                            d.PC1 = +d.PC1;
+                            d.PC2 = +d.PC2;
+                        });
+
+                        const xScale = d3.scaleLinear()
+                            .domain(d3.extent(data, d => d.PC1))
+                            .range([0, width]);
+
+                        const yScale = d3.scaleLinear()
+                            .domain(d3.extent(data, d => d.PC2))
+                            .range([height, 0]);
+
+                        const xAxis = svg.append("g")
+                            .attr("class", "x-axis")
+                            .attr("transform", `translate(0,${height})`)
+                            .call(d3.axisBottom(xScale));
+
+                        const yAxis = svg.append("g")
+                            .attr("class", "y-axis")
+                            .call(d3.axisLeft(yScale));
+
+                        svg.append("text")
+                            .attr("class", "x-axis-label")
+                            .attr("x", width / 2)
+                            .attr("y", height + margin.bottom - 10)
+                            .attr("text-anchor", "middle")
+                            .text("PC1");
+
+                        svg.append("text")
+                            .attr("class", "y-axis-label")
+                            .attr("x", -height / 2)
+                            .attr("y", -margin.left + 15)
+                            .attr("transform", "rotate(-90)")
+                            .attr("text-anchor", "middle")
+                            .text("PC2");
+
+                        // brushing??!?!?!?!!
+                        const brush = d3.brush()
+                            .extent([[0, 0], [width, height]])
+                            .on("start", brushstart)
+                            .on("brush", brushmove)
+                            .on("end", brushend);
+
+                        svg.append("g")
+                            .attr("class", "brush")
+                            .call(brush);
+
+                        function updatePCA() {
+                            const points = svg.selectAll(".point")
+                                .data(data, d => d.Title);
+
+                            points.enter()
+                                .append("circle")
+                                .attr("class", "point")
+                                .attr("cx", d => xScale(d.PC1))
+                                .attr("cy", d => yScale(d.PC2))
+                                .attr("r", 5)
+                                .attr("fill", "grey")
+                                .attr("opacity", 0.7)
+                                .on("mouseover", function (event, d) {
+                                    tooltip.transition().duration(200).style("opacity", 1);
+                                    tooltip.html(
+                                        `<strong>Title:</strong> ${d.Title}<br>
+                                        <strong>PC1:</strong> ${d.PC1.toFixed(2)}<br>
+                                        <strong>PC2:</strong> ${d.PC2.toFixed(2)}<br>
+                                        <strong>Genre 1:</strong> ${d.Genre_1 || "N/A"}<br>
+                                        <strong>Genre 2:</strong> ${d.Genre_2 || "N/A"}<br>
+                                        <strong>Genre 3:</strong> ${d.Genre_3 || "N/A"}`
+                                    )
+                                        .style("top", `${event.pageY - 28}px`)
+                                        .style("left", `${event.pageX + 5}px`);
+                                })
+                                .on("mousemove", function (event) {
+                                    tooltip.style("left", `${event.pageX + 10}px`)
+                                        .style("top", `${event.pageY - 20}px`);
+                                })
+                                .on("mouseout", () => {
+                                    tooltip.transition().duration(200).style("opacity", 0);
+                                })
+                                .merge(points)
+                                .transition()
+                                .duration(750)
+                                .attr("cx", d => xScale(d.PC1))
+                                .attr("cy", d => yScale(d.PC2));
+
+                            points.exit()
+                                .transition()
+                                .duration(500)
+                                .attr("r", 0)
+                                .remove();
+                        }
+
+                        function brushstart() {
+                            svg.selectAll(".point")
+                                .transition()
+                                .duration(200)
+                                .attr("r", 2)
+                                .attr("opacity", 0.3); 
+                        }
+
+                        function brushmove(event) {
+                            const selection = event.selection;
+                            if (!selection) return;
+
+                            const [[x0, y0], [x1, y1]] = selection;
+
+                            selectedPoints.clear();
+                            data.forEach(d => {
+                                if (
+                                    xScale(d.PC1) >= x0 && xScale(d.PC1) <= x1 &&
+                                    yScale(d.PC2) >= y0 && yScale(d.PC2) <= y1
+                                ) {
+                                    selectedPoints.add(d.Title);
+                                }
+                            });
+
+                            updatePlots();
+                        }
+
+
+                        function brushend(event) {
+                            if (!event.selection) {
+                                selectedPoints.clear();
+
+                                d3.selectAll(".point")
+                                    .transition()
+                                    .duration(200)
+                                    .attr("r", 5) 
+                                    .attr("opacity", 0.7) 
+                                    .attr("fill", "grey");
+
+                                resetBarChartColors();
+                                updatePlots(); 
+                            }
+                        }
+                        updatePCA();
+                    }).catch(error => console.error("Error loading PCA data:", error));
+                }
+
+                // scatterplot to give user option to see different attributes
+                function splot() {
+                    const attributes = [
+                        'Anime_Score', 'Anime_Rank', 'Anime_Popularity', 'Anime_Members',
+                        'Manga_Score', 'Manga_Rank', 'Manga_Popularity', 'Manga_Members'
+                    ];
+
+                    const margin = { top: 20, right: 20, bottom: 50, left: 70 };
+                    const width = 450 - margin.left - margin.right;
+                    const height = 375 - margin.top - margin.bottom;
+
+                    const svg = d3.select(".scatter-plot #splot")
+                        .append("svg")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    const controls = d3.select(".scatter-plot #splot")
+                        .append("div")
+                        .attr("class", "controls");
+
+                    controls.append("label").text("X-axis: ");
+                    const xSelect = controls.append("select").attr("id", "x-axis-select");
+                    controls.append("label").text("Y-axis: ");
+                    const ySelect = controls.append("select").attr("id", "y-axis-select");
+
+                    attributes.forEach(attr => {
+                        xSelect.append("option").attr("value", attr).text(attr);
+                        ySelect.append("option").attr("value", attr).text(attr);
+                    });
+
+                    const preXattr = attributes[0];
+                    const preYattr = attributes[1];
+                    xSelect.node().value = preXattr;
+                    ySelect.node().value = preYattr;
+
+                    const tooltip = d3.select(".dashboard")
+                        .append("div")
+                        .attr("class", "tooltip")
+                        .style("position", "absolute")
+                        .style("background", "lightgrey")
+                        .style("color", "black")
+                        .style("border", "1px solid #ccc")
+                        .style("border-radius", "5px")
+                        .style("padding", "5px")
+                        .style("pointer-events", "none")
+                        .style("opacity", 0);
+
+                    d3.csv("real_animanga.csv").then(data => {
+                        attributes.forEach(attr => {
+                            data.forEach(d => {
+                                d[attr] = +d[attr];
+                            });
+                        });
+
+                        data = data.filter(d =>
+                            attributes.every(attr => !isNaN(d[attr]) && d[attr] !== 0)
+                        );
+
+                        let xAttribute = preXattr;
+                        let yAttribute = preYattr;
+
+                        const xScale = d3.scaleLinear().range([0, width]);
+                        const yScale = d3.scaleLinear().range([height, 0]);
+
+                        const xAxis = svg.append("g").attr("class", "x-axis").attr("transform", `translate(0,${height})`);
+                        const yAxis = svg.append("g").attr("class", "y-axis");
+
+                        const brush = d3.brush()
+                            .extent([[0, 0], [width, height]])
+                            .on("start", brushstart)
+                            .on("brush", brushmove)
+                            .on("end", brushend);
+
+                        svg.append("g")
+                            .attr("class", "brush")
+                            .call(brush);
+
+                        function updateScatterplot() {
+                            xScale.domain(d3.extent(data, d => d[xAttribute]));
+                            yScale.domain(d3.extent(data, d => d[yAttribute]));
+
+                            xAxis.transition().duration(750).call(d3.axisBottom(xScale));
+                            yAxis.transition().duration(750).call(d3.axisLeft(yScale));
+
+                            svg.selectAll(".x-axis-label").remove();
+                            svg.selectAll(".y-axis-label").remove();
+
+                            svg.append("text")
+                                .attr("class", "x-axis-label")
+                                .attr("x", width / 2)
+                                .attr("y", height + margin.bottom - 10)
+                                .attr("text-anchor", "middle")
+                                .text(xAttribute);
+
+                            svg.append("text")
+                                .attr("class", "y-axis-label")
+                                .attr("x", -height / 2)
+                                .attr("y", -margin.left + 11)
+                                .attr("transform", "rotate(-90)")
+                                .attr("text-anchor", "middle")
+                                .text(yAttribute);
+
+                            const points = svg.selectAll(".point")
+                                .data(data, d => d.Title);
+
+                            points.enter()
+                                .append("circle")
+                                .attr("class", "point")
+                                .attr("cx", d => xScale(d[xAttribute]))
+                                .attr("cy", d => yScale(d[yAttribute]))
+                                .attr("r", 5)
+                                .attr("fill", "grey")
+                                .attr("opacity", 0.7)
+                                .on("mouseover", function (event, d) {
+                                    tooltip.transition().duration(200).style("opacity", 1);
+                                    tooltip.html(
+                                        `<strong>Title:</strong> ${d.Title || "N/A"}<br>
+                                        <strong>${xAttribute}:</strong> ${d[xAttribute]}<br>
+                                        <strong>${yAttribute}:</strong> ${d[yAttribute]}`
+                                    )
+                                        .style("top", `${event.pageY - 28}px`)
+                                        .style("left", `${event.pageX + 5}px`);
+                                })
+                                .on("mousemove", function (event) {
+                                    tooltip.style("left", `${event.pageX + 10}px`)
+                                        .style("top", `${event.pageY - 20}px`);
+                                })
+                                .on("mouseout", () => {
+                                    tooltip.transition().duration(200).style("opacity", 0);
+                                })
+                                .merge(points)
+                                .transition()
+                                .duration(750)
+                                .attr("cx", d => xScale(d[xAttribute]))
+                                .attr("cy", d => yScale(d[yAttribute]));
+
+                            points.exit().transition().duration(500).attr("r", 0).remove();
+                        }
+
+                        function brushstart() {
+                            svg.selectAll(".point")
+                                .transition()
+                                .duration(200)
+                                .attr("r", 2)
+                                .attr("opacity", 0.2);
+                        }
+
+                        function brushmove(event) {
+                            const selection = event.selection;
+                            if (!selection) return;
+
+                            const [[x0, y0], [x1, y1]] = selection;
+
+                            selectedPoints.clear();
+                            data.forEach(d => {
+                                if (
+                                    xScale(d[xAttribute]) >= x0 && xScale(d[xAttribute]) <= x1 &&
+                                    yScale(d[yAttribute]) >= y0 && yScale(d[yAttribute]) <= y1
+                                ) {
+                                    selectedPoints.add(d.Title);
+                                }
+                            });
+
+                            updatePlots();
+                        }
+
+                        function brushend(event) {
+                            if (!event.selection) {
+                                selectedPoints.clear();
+
+                                d3.selectAll(".point")
+                                    .transition()
+                                    .duration(200)
+                                    .attr("r", 5) 
+                                    .attr("opacity", 0.7) 
+                                    .attr("fill", "grey"); 
+
+                                resetBarChartColors();
+                                updatePlots(); 
+                            }
+                        }
+
+                        xSelect.on("change", () => {
+                            xAttribute = xSelect.node().value;
+                            updateScatterplot();
+                        });
+
+                        ySelect.on("change", () => {
+                            yAttribute = ySelect.node().value;
+                            updateScatterplot();
+                        });
+
+                        updateScatterplot();
+                    }).catch(error => console.error("Error loading data:", error));
+                }
+
+
+                // time series area chart
+                function achart() {
+                    const margin = { top: 20, right: 30, bottom: 70, left: 70 },
+                        width = 950 - margin.left - margin.right,
+                        height = 400 - margin.top - margin.bottom;
+
+                    const svg = d3.select("#timechart")
+                                .append("svg")
+                                .attr("width", width + margin.left + margin.right)
+                                .attr("height", height + margin.top + margin.bottom)
+                                .append("g")
+                                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+                    const datasets = {
+                        "Anime Start Year": "top_genres_anime_start_trends.csv",
+                        "Anime End Year": "top_genres_anime_end_trends.csv",
+                        "Manga Start Year": "top_genres_manga_start_trends.csv",
+                        "Manga End Year": "top_genres_manga_end_trends.csv"
+                    };
+                    const xAxisLabels = {
+                        "Anime Start Year": "Anime Start Year",
+                        "Anime End Year": "Anime End Year",
+                        "Manga Start Year": "Manga Start Year",
+                        "Manga End Year": "Manga End Year"
+                    };
+                    const defaultDataset = "Anime Start Year";
+
+                    const xScale = d3.scaleLinear().range([0, width]);
+                    const yScale = d3.scaleLinear().range([height, 0]);
+
+                    const xAxis = svg.append("g").attr("transform", `translate(0,${height})`);
+                    const yAxis = svg.append("g");
+
+                    const xAxisLabel = svg.append("text")
+                                        .attr("x", width / 2)
+                                        .attr("y", height + margin.bottom - 25)
+                                        .attr("text-anchor", "middle")
+                                        .attr("font-size", "14px")
+                                        .attr("font-weight", "bold");
+
+                    const yAxisLabel = svg.append("text")
+                                        .attr("x", -(height / 2))
+                                        .attr("y", -margin.left + 20)
+                                        .attr("transform", "rotate(-90)")
+                                        .attr("text-anchor", "middle")
+                                        .attr("font-size", "14px")
+                                        .attr("font-weight", "bold")
+                                        .text("Count");
+
+                    const tooltip = d3.select(".dashboard")
+                        .append("div")
+                        .attr("class", "tooltip")
+                        .style("position", "absolute")
+                        .style("background", "lightgrey")
+                        .style("color", "black")
+                        .style("border", "1px solid #ccc")
+                        .style("border-radius", "5px")
+                        .style("padding", "5px")
+                        .style("pointer-events", "none")
+                        .style("opacity", 0);
+
+                    svg.append("defs").append("clipPath")
+                    .attr("id", "clip")
+                    .append("rect")
+                    .attr("width", width)
+                    .attr("height", height);
+
+                    // brush
+                    // inspo: https://d3-graph-gallery.com/graph/line_brushZoom.html
+
+                    // clipping path
+                    const areaGroup = svg.append("g").attr("clip-path", "url(#clip)");
+
+                    const color = d3.scaleOrdinal()
+                        .domain([...Array(18).keys()]) 
+                        .range(colorScale);
+
+                    const brush = d3.brushX()
+                                    .extent([[0, 0], [width, height]])
+                                    .on("end", updateChart);
+
+                    areaGroup.append("g").attr("class", "brush").call(brush);
+
+                    let idleTimeout;
+                    function idled() { idleTimeout = null; }
+
+                    function updateChart(event) {
+                        const extent = event.selection;
+
+                        if (!extent) {
+                            if (!idleTimeout) return (idleTimeout = setTimeout(idled, 350));
+                            xScale.domain(d3.extent(currentData, d => d.Year));
+                        } else {
+                            xScale.domain([xScale.invert(extent[0]), xScale.invert(extent[1])]);
+                            areaGroup.select(".brush").call(brush.move, null); 
+                        }
+
+                        // filter out years that fit in current domain (had issue where ticks would be the same number)
+                        const filteredYears = currentData
+                            .map(d => d.Year)
+                            .filter(year => year >= xScale.domain()[0] && year <= xScale.domain()[1]);
+
+                        xAxis.transition()
+                            .duration(1000)
+                            .call(
+                                d3.axisBottom(xScale)
+                                    .tickValues(filteredYears) 
+                                    .tickFormat(d3.format("d")) 
+                            );
+
+                        areaGroup.selectAll("path")
+                            .transition()
+                            .duration(1000)
+                            .attr("d", d3.area()
+                                .x(d => xScale(d.data.Year))
+                                .y0(d => yScale(d[0]))
+                                .y1(d => yScale(d[1])));
+                    }
+
+                    // reset chart on double-click
+                    svg.on("dblclick", () => {
+                        xScale.domain(d3.extent(currentData, d => d.Year));
+                        xAxis.transition().duration(1000).call(d3.axisBottom(xScale).tickFormat(d3.format("d")));
+                        areaGroup.selectAll("path")
+                                .transition()
+                                .duration(1000)
+                                .attr("d", d3.area()
+                                            .x(d => xScale(d.data.Year))
+                                            .y0(d => yScale(d[0]))
+                                            .y1(d => yScale(d[1])));
+                    });
+
+                    let currentData; 
+
+                    // inspo https://d3-graph-gallery.com/graph/stackedarea_basic.html
+                    function updateDataset(datasetName) {
+                        d3.csv(datasets[datasetName]).then(data => {
+                            const genres = Object.keys(data[0]).filter(d => d !== "Date");
+                            currentData = data.map(d => ({
+                                Year: +d.Date.split("-")[0], 
+                                ...genres.reduce((acc, genre) => ({ ...acc, [genre]: +d[genre] }), {})
+                            }));
+
+                            const aggregatedData = Array.from(d3.group(currentData, d => d.Year), ([key, values]) => {
+                                const aggregatedGenres = genres.reduce((acc, genre) => {
+                                    acc[genre] = d3.sum(values, d => d[genre]);
+                                    return acc;
+                                }, {});
+                                return { Year: key, ...aggregatedGenres };
+                            });
+
+                            xScale.domain(d3.extent(aggregatedData, d => d.Year));
+                            yScale.domain([0, d3.max(aggregatedData, d =>
+                                d3.sum(genres.map(genre => d[genre]))
+                            )]).nice();
+
+                            xAxis.transition().duration(1000).call(d3.axisBottom(xScale).tickFormat(d3.format("d")));
+                            yAxis.transition().duration(1000).call(d3.axisLeft(yScale));
+
+                            xAxisLabel.text(xAxisLabels[datasetName]);
+
+                            const stack = d3.stack()
+                                            .keys(genres)
+                                            .order(d3.stackOrderNone)
+                                            .offset(d3.stackOffsetNone);
+
+                            const stackedData = stack(aggregatedData.map(d => ({
+                                Year: d.Year,
+                                ...genres.reduce((acc, genre) => ({ ...acc, [genre]: d[genre] }), {})
+                            })));
+
+
+                            function handleMouseOver(event, d) {
+                                console.log(d);
+                                const genre = d.key;
+                                const year = Math.round(xScale.invert(d3.pointer(event)[0]));
+                                const count = d3.sum(currentData.filter(e => e.Year === +year), e => e[genre]);
+
+                                // console.log(`<strong>${genre}</strong><br>Count: ${count}<br>
+                                //             <strong>Year</strong>: ${year}`);
+
+                                tooltip.transition().duration(200).style("opacity", 1);
+                                tooltip.html(`<strong>${genre} Count</strong>: ${count}<br>
+                                            <strong>Year</strong>: ${year}`)
+                                    .style("left", `${event.pageX + 10}px`)
+                                    .style("top", `${event.pageY - 20}px`);
+                                
+                            }
+
+                            function handleMouseMove(event) {
+                                tooltip.style("left", `${event.pageX + 10}px`)
+                                    .style("top", `${event.pageY - 20}px`);
+                            }
+
+                            function handleMouseOut() {
+                                tooltip.transition().duration(200).style("opacity", 0);
+                            }
+
+                            const areas = areaGroup.selectAll("path").data(stackedData);
+
+                            areas.enter()
+                                .append("path")
+                                .attr("fill", d => color(d.key))
+                                .attr("d", d3.area()
+                                    .x(d => xScale(d.data.Year))
+                                    .y0(d => yScale(d[0]))
+                                    .y1(d => yScale(d[1])))
+                                .merge(areas)
+                                .transition() 
+                                .duration(1000)
+                                .attr("d", d3.area()
+                                    .x(d => xScale(d.data.Year))
+                                    .y0(d => yScale(d[0]))
+                                    .y1(d => yScale(d[1])))
+                                .on("end", function() { 
+                                    d3.select(this)
+                                        .on("mouseover", handleMouseOver)
+                                        .on("mousemove", handleMouseMove)
+                                        .on("mouseout", handleMouseOut);
+                                });
+
+
+                            areas.exit().remove();
+                        }).catch(error => console.error(error));
+                    }
+
+                    updateDataset(defaultDataset);
+
+                    // add buttons to switch datasets
+                    const buttonContainer = d3.select("#timechart")
+                                            .append("div")
+                                            .attr("class", "button-container");
+
+                    Object.keys(datasets).forEach(datasetName => {
+                        buttonContainer.append("button")
+                                    .text(datasetName)
+                                    .on("click", () => updateDataset(datasetName));
+                    });
+                }
+
+                addResetButton();
+                barChart();
+                pca();
+                splot();
+                achart();
+    
+            } catch (error) {
+                console.error("error loading or processing data:", error);
+            }
+        }
+
+        dashboard();
+
+    </script>
+</body>
+</html>

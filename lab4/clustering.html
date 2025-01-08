@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Clustering Visualization</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style></style>
+    <nav>
+        <a href="index.html">User-Based Coloring</a>
+        <a href="clustering.html">Clustering-Based Coloring</a>
+    </nav>
+</head>
+<body>
+    <h1>Clustering Visualization</h1>
+
+    <section>
+        <h3 style="color:blue">Cluster 0: Blue</h3>
+        <h3 style="color:orange">Cluster 1: Orange</h3>
+        <h3 style="color:green">Cluster 2: Green</h3>
+        <h3 style="color:red">Cluster 3: Red</h3>
+        <!-- <h3 style="color:purple">Cluster 4: Purple</h3> -->
+    </section>
+
+    <section>
+        <h2>Biplot</h2>
+        <div id="biplot"></div>
+    </section>
+    
+    <section>
+        <h2>MDS Euclidean</h2>
+        <div id="mds-euclidean"></div>
+    </section>
+    
+    <section>
+        <h2>Parallel Coordinates Chart</h2>
+        <div id="parallel-coordinates"></div>
+    </section>
+
+    <script>
+
+// ======================================================= CLUSTERED PARALLEL COORDINATES CHART =======================================================
+
+    async function createParallelCoordinatesChart() {
+        try {
+            const data = await d3.csv("clustered_animanga_null.csv");
+
+            const numericalVars = [
+                "Anime_Score", "Anime_Rank", "Manga_Score", "Manga_Rank",
+                "Manga_Members", "Anime_Members", "Anime_Popularity", "Manga_Popularity"
+            ];
+            const categoricalVars = ["Genres", "Stream_type"];
+            const topGenres = [
+                    "Action", "Comedy", "Drama", "Adventure", "Fantasy",
+                    "Mystery", "Horror", "Slice of Life", "Romance"
+                ];
+
+            const clusters = [...new Set(data.map(d => d.Cluster))];
+
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(clusters);
+
+            const margin = { top: 60, right: 20, bottom: 30, left: 40 };
+            const width = 1200 - margin.left - margin.right;
+            const height = 600 - margin.top - margin.bottom;
+
+            const svg = d3.select("#parallel-coordinates").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left},${margin.top})`);
+
+            const columns = [...numericalVars, ...categoricalVars];
+
+            // assign "Other" for genres outside the topGenres
+            data.forEach(d => {
+                const firstGenre = d.Genres.split(",")[0].trim();
+                d.Genres = topGenres.includes(firstGenre) ? firstGenre : "Other";
+            });
+
+            // create scales for each column
+            const y = {};
+            columns.forEach(column => {
+                if (categoricalVars.includes(column)) {
+                    y[column] = d3.scalePoint()
+                        .domain([...new Set(data.map(d => d[column]))].sort())
+                        .range([height, 0]);
+                } else {
+                    y[column] = d3.scaleLinear()
+                        .domain(d3.extent(data, d => +d[column]))
+                        .range([height, 0]);
+                }
+            });
+
+            const x = d3.scalePoint().range([0, width]).padding(1).domain(columns);
+
+            // draw lines with cluster coloring
+            svg.append("g").selectAll(".line")
+                .data(data)
+                .enter()
+                .append("path")
+                .attr("class", "line")
+                .attr("d", d => d3.line()(columns.map(p => [x(p), y[p](d[p])])))
+                .style("fill", "none")
+                .style("stroke", d => colorScale(d.Cluster)) // color based on cluster
+                .style("stroke-width", 1.5)
+                .style("opacity", 0.7);
+
+            // draw axes
+            const axis = svg.selectAll(".dimension")
+                .data(columns)
+                .enter()
+                .append("g")
+                .attr("class", "dimension")
+                .attr("transform", d => `translate(${x(d)})`);
+
+            axis.append("g").each(function(d) {
+                d3.select(this).call(d3.axisLeft(y[d]));
+            });
+
+            axis.append("text")
+                .attr("fill", "black")
+                .attr("y", -10)
+                .attr("text-anchor", "middle")
+                .attr("x", 0)
+                .text(d => d)
+                .style("font-size", "12px");
+        } catch (error) {
+            console.error("Error loading data for parallel coordinates chart:", error);
+        }
+    }
+
+    createParallelCoordinatesChart();
+
+// ======================================================= CLUSTERED BIPLOT =======================================================
+
+    async function createBiplot() {
+        try {
+            const data = await d3.csv("clu_pca_projection_genres.csv");
+            const loadings = await d3.csv("clu_biplot_loadings.csv")
+
+            const width = 600, height = 600, margin = 50;
+            const clusters = [...new Set(data.map(d => d.Cluster))];
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(clusters);
+
+            const svg = d3.select("#biplot").append("svg")
+                .attr("width", width + margin * 2)
+                .attr("height", height + margin * 2)
+                .append("g")
+                .attr("transform", `translate(${margin}, ${margin})`);
+
+            const xScale = d3.scaleLinear().domain(d3.extent(data, d => +d.PC1)).range([0, width]);
+            const yScale = d3.scaleLinear().domain(d3.extent(data, d => +d.PC2)).range([height, 0]);
+
+            svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
+            svg.append("g").call(d3.axisLeft(yScale));
+
+            svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", d => xScale(+d.PC1))
+                .attr("cy", d => yScale(+d.PC2))
+                .attr("r", 6)
+                .attr("fill", d => colorScale(d.Cluster))
+                .attr("opacity", 0.7);
+
+            // add biplot loadings (arrows)
+            svg.selectAll(".arrow")
+                    .data(loadings)
+                    .enter()
+                    .append("line")
+                    .attr("x1", xScale(0))
+                    .attr("y1", yScale(0))
+                    .attr("x2", d => xScale(+d.PC1_loading * 5))
+                    .attr("y2", d => yScale(+d.PC2_loading * 5))
+                    .attr("stroke", "black")
+                    .attr("stroke-width", 2)
+                    .attr("marker-end", "url(#arrow)");
+
+            // add biplot labels
+            svg.selectAll(".label")
+                    .data(loadings)
+                    .enter()
+                    .append("text")
+                    .attr("x", d => xScale(+d.PC1_loading * 5) + 5)
+                    .attr("y", d => yScale(+d.PC2_loading * 5) + 5)
+                    .text(d => d.Attribute)
+                    .attr("fill", "purple")
+                    .attr("font-size", "15px")
+                    .attr("font-weight", "bold");
+
+            // add axis labels
+            svg.append("text")
+                    .attr("x", width / 2)
+                    .attr("y", height + 35)
+                    .attr("text-anchor", "middle")
+                    .text("PC1");
+            svg.append("text")
+                    .attr("x", -height / 2)
+                    .attr("y", -35)
+                    .attr("transform", "rotate(-90)")
+                    .attr("text-anchor", "middle")
+                    .text("PC2");
+
+                // add marker definition for arrows
+            svg.append("defs").append("marker")
+                    .attr("id", "arrow")
+                    .attr("viewBox", "0 -5 10 10")
+                    .attr("refX", 10)
+                    .attr("refY", 0)
+                    .attr("markerWidth", 6)
+                    .attr("markerHeight", 6)
+                    .attr("orient", "auto")
+                    .append("path")
+                    .attr("d", "M0,-5L10,0L0,5")
+                    .attr("fill", "black");
+
+        } catch (err) {
+            console.error("error loading PCA biplot data:", err);
+        }
+    }
+
+    createBiplot();
+
+// ======================================================= CLUSTERED MDS =======================================================
+
+    async function createMDSEuclideanPlot() {
+        try {
+            const data = await d3.csv("clu_mds_euclidean.csv");
+
+            const width = 800, height = 800;
+            const margin = { top: 50, right: 50, bottom: 50, left: 100 };
+            const clusters = [...new Set(data.map(d => d.Cluster))];
+            const colorScale = d3.scaleOrdinal(d3.schemeCategory10).domain(clusters);
+
+            const svg = d3.select("#mds-euclidean").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+            const xScale = d3.scaleLinear().domain(d3.extent(data, d => +d.MDS1)).range([0, width]);
+            const yScale = d3.scaleLinear().domain(d3.extent(data, d => +d.MDS2)).range([height, 0]);
+
+            svg.append("g").attr("transform", `translate(0, ${height})`).call(d3.axisBottom(xScale));
+            svg.append("g").call(d3.axisLeft(yScale));
+
+            svg.selectAll("circle")
+                .data(data)
+                .enter()
+                .append("circle")
+                .attr("cx", d => xScale(+d.MDS1))
+                .attr("cy", d => yScale(+d.MDS2))
+                .attr("r", 6)
+                .attr("fill", d => colorScale(d.Cluster))
+                .attr("opacity", 0.7);
+        } catch (err) {
+            console.error("error loading MDS data:", err);
+        }
+    }
+
+    createMDSEuclideanPlot();
+
+
+    </script>
+</body>
+</html>

@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>Anime and Manga Data Visualizations</title>
+    <script src="https://d3js.org/d3.v3.min.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            margin: 20px; 
+            background-color: #f9f9f9;
+        }
+        h1 { 
+            text-align: center; 
+            margin-bottom: 40px;
+        }
+        .section { 
+            margin-bottom: 30px; 
+        }
+        .chart { 
+            border: 1px solid #ccc; 
+            padding: 10px; 
+            margin: 10px;
+            background-color: #fff;
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.1);
+        }
+        .axis path, .axis line {
+            fill: none;
+            stroke: #000;
+            shape-rendering: crispEdges;
+        }
+        .legend {
+            font-size: 12px;
+        }
+        .tooltip { 
+            position: absolute; 
+            text-align: center; 
+            padding: 5px; 
+            font: 12px sans-serif; 
+            background: lightsteelblue; 
+            border: 0px; 
+            border-radius: 8px; 
+            pointer-events: none; 
+        }
+        .visualizations {
+            display: flex;
+            justify-content: space-between;
+            flex-wrap: wrap;
+        }
+        .viz-container {
+            flex: 1 1 45%;
+            margin: 20px;
+        }
+        @media (max-width: 1200px) {
+            .viz-container {
+                flex: 1 1 100%;
+            }
+        }
+        .footnote {
+            font-size: 12px;
+            color: #666;
+            text-align: center;
+        }
+        .genreInfoBar, .genreInfoPie {
+            font-size: 12px;
+            color: #e99191;
+            padding: 10px;
+            /* width: 40%; */
+        }
+
+    </style>
+</head>
+<body>
+    <h1>Anime and Manga Data Visualizations</h1>
+
+    <!-- BAR CHART / HISTOGRAM -->
+    <div class="section">
+        <h2>Bar Chart (Categorical Variables) / Histogram (Numerical Variables)</h2>
+        <label for="variableSelect">Select a variable:</label>
+        <div id="barButtonContainer" style="display: inline-block;">
+            <select id="variableSelect"></select>
+        </div>
+        <div class="visualizations">
+            <div id="barChart" class="chart viz-container"></div>
+            <div id="secondaryBarChart" class="chart viz-container"></div>
+            <div id="histogram" class="chart viz-container"></div>
+        </div>
+
+        <div class="genreInfoBar">
+            The Anime Genre datapoints were separated by commas with up to 3 different genres that could be interpreted as such:
+            the primary genre, the secondary, and the tertiary. The first chart represents the distribution of "primary" genres.
+            There is also an option to view the secondary genres as well. The tertiary option is not displayed because the datapoints
+            do not always have three genres.
+        </div>
+    </div>
+
+    <!-- PIECHARTS -->
+    <div class="section">
+        <h2>Pie Chart</h2>
+        <label for="pieChartSelect">Select a category:</label>
+        <div id="buttonContainer" style="display: inline-block;">
+            <select id="pieChartSelect">
+                <option value="Genres">Anime Genres</option>
+                <option value="Manga_Demographics">Manga Demographics</option>
+                <option value="Stream_type">Anime Stream Type</option>
+                <option value="Episode_length">Average Episode Length per Anime</option>
+            </select>
+        </div>
+        <!-- PIE CHART TITLES -->
+        <h3 id="pieChartTitle"></h3>
+        <div id="pieChart" class="chart"></div>
+
+        <h3 id="secondaryPieChartTitle" style="display: none;"></h3>
+        <div id="secondaryPieChart" class="chart"></div>
+
+        <div class="genreInfoPie">
+            The Anime Genre datapoints were separated by commas with up to 3 different genres that could be interpreted as such:
+            the primary genre, the secondary, and the tertiary. The first chart represents the distribution of "primary" genres.
+            There is also an option to view the secondary genres as well. The tertiary option is not displayed because the datapoints
+            do not always have three genres.
+        </div>
+    </div>
+
+    <!-- SCATTERPLOT -->
+    <div class="section">
+        <h2>Scatterplot</h2>
+        <div>
+            <label>Choose X-Axis:</label>
+            <label><input type="radio" name="xAxis" value="Anime_Score" checked> Anime Score</label>
+            <label><input type="radio" name="xAxis" value="Anime_Rank"> Anime Rank</label>
+            <label><input type="radio" name="xAxis" value="Anime_Popularity"> Anime Popularity</label>
+            <label><input type="radio" name="xAxis" value="Anime_Members"> Anime Members</label>
+            <label><input type="radio" name="xAxis" value="Genres"> Anime Genres</label>
+            <label><input type="radio" name="xAxis" value="Stream_type"> Anime Stream Type</label>
+            <label><input type="radio" name="xAxis" value="Manga_Score"> Manga Score</label>
+            <label><input type="radio" name="xAxis" value="Manga_Rank"> Manga Rank</label>
+            <label><input type="radio" name="xAxis" value="Manga_Popularity"> Manga Popularity</label>
+            <label><input type="radio" name="xAxis" value="Manga_Members"> Manga Members</label>
+            <label><input type="radio" name="xAxis" value="Manga_Demographics"> Manga Demographics</label>
+            
+        </div>
+        <div>
+            <label>Choose Y-Axis:</label>
+            <label><input type="radio" name="yAxis" value="Anime_Score" checked> Anime Score</label>
+            <label><input type="radio" name="yAxis" value="Anime_Rank"> Anime Rank</label>
+            <label><input type="radio" name="yAxis" value="Anime_Popularity"> Anime Popularity</label>
+            <label><input type="radio" name="yAxis" value="Anime_Members"> Anime Members</label>
+            <label><input type="radio" name="yAxis" value="Genres"> Anime Genres</label>
+            <label><input type="radio" name="yAxis" value="Stream_type"> Anime Stream Type</label>
+            <label><input type="radio" name="yAxis" value="Manga_Score"> Manga Score</label>
+            <label><input type="radio" name="yAxis" value="Manga_Rank"> Manga Rank</label>
+            <label><input type="radio" name="yAxis" value="Manga_Popularity"> Manga Popularity</label>
+            <label><input type="radio" name="yAxis" value="Manga_Members"> Manga Members</label>
+            <label><input type="radio" name="yAxis" value="Manga_Demographics"> Manga Demographics</label>
+            
+        </div>
+        <div id="scatterplot" class="chart"></div>
+    </div>
+
+    <div class="footnote">
+        Note: This is a comparison between Anime and their derived Manga. Not all Anime had a corresponding Manga to begin with.
+    </div>
+
+    <script type="text/javascript">
+        d3.csv("animanga.csv", function(error, data) {
+            if (error) throw error;
+
+// ==================================================== BAR CHART / HISTOGRAM ====================================================
+
+            // parsing numerical and categorical vars
+            var numericalVars = ['Anime_Rank', 'Anime_Popularity', 'Anime_Score', 'Episodes', 'Anime_Members', 'Manga_Score', 'Manga_Rank', 'Manga_Popularity', 'Manga_Chapters', 'Manga_Members'];
+            var categoricalVars = ['Stream_type', 'Genres', 'Episode_length', 'Manga_Demographics'];
+            var allVars = categoricalVars.concat(numericalVars);
+
+            data = data.filter(function(d) {
+                return d.Manga !== "" && numericalVars.every(varName => d[varName] !== "") &&
+                    categoricalVars.every(varName => {
+                        if (varName === 'Manga_Demographics') return d[varName] !== "[]";  // remove "[]" from 'Manga_Demographics'
+                        return d[varName] !== "" && d[varName] !== null;
+                    });
+            });
+
+            // converting numerical values to actual numbers for graphing
+            data.forEach(function(d) {
+                numericalVars.forEach(function(varName) {
+                    // clean 'Anime_Members' specifically by removing spaces and commas, then convert to number
+                    if (varName === 'Anime_Members') {
+                        d[varName] = +d[varName].replace(/[\s,]+/g, ""); // remove spaces at the end of data point and commas as well
+                    } else {
+                        d[varName] = +d[varName]; // convert other numerical variables to numbers
+                    }
+                });
+            });
+
+            var variableSelect = d3.select("#variableSelect");
+            allVars.forEach(function(varName) {
+                variableSelect.append("option")
+                             .attr("value", varName)
+                             .text(varName);
+            });
+
+            // initial visualization based on page opening
+            var initialVar = allVars[0];
+            updateBarChart(initialVar);
+            updateHistogram(initialVar);
+
+            d3.select(".genreInfoBar").style("display", "none");
+            d3.select("#secondaryBarChart").style("display", "none");
+
+            var secondaryBarChartButton = d3.select("#barButtonContainer").append("button")
+                .text("Show Secondary Genres Bar Chart")
+                .style("display", "none")  
+                .style("margin-left", "10px") 
+                .on("click", function() {
+                    var isVisible = d3.select("#secondaryBarChart").style("display") === "none";
+                    if (isVisible) {
+                        updateBarChart("Genres", "secondary");
+                        d3.select("#secondaryBarChart").style("display", "block");
+                        secondaryBarChartButton.text("Hide Secondary Genres Bar Chart");
+                    } else {
+                        d3.select("#secondaryBarChart").style("display", "none");
+                        secondaryBarChartButton.text("Show Secondary Genres Bar Chart");
+                    }
+                });
+
+            // updating visualization based on selection of property from drop down menu
+            variableSelect.on("change", function() {
+                var selectedVar = d3.select(this).property("value");
+                updateBarChart(selectedVar, "primary"); 
+                updateHistogram(selectedVar);
+                
+                // show or hide the secondary bar chart button and genreInfoBar based on 'Genres' selection
+                if (selectedVar === "Genres") {
+                    secondaryBarChartButton.style("display", "inline-block");
+                    d3.select(".genreInfoBar").style("display", "block"); 
+                } else {
+                    secondaryBarChartButton.style("display", "none");
+                    d3.select("#secondaryBarChart").style("display", "none"); 
+                    secondaryBarChartButton.text("Show Secondary Genres Bar Chart"); 
+                    d3.select(".genreInfoBar").style("display", "none"); 
+                }
+            });
+
+            // function to update the BAR CHART
+            function updateBarChart(variable, genreType = "primary") {
+                var containerId = genreType === "primary" ? "#barChart" : "#secondaryBarChart";
+                d3.select(containerId).html(""); // clear previous chart
+
+                if (categoricalVars.indexOf(variable) === -1) {
+                    d3.select(containerId).append("p").text("Selected variable is not categorical.");
+                    return;
+                }
+
+                // footnote for primary genre only
+                if (variable === "Genres" && genreType === "primary") {
+                    d3.select("#barChart").append("p")
+                        .attr("class", "footnote")
+                        .text("Note: Only the primary genre was used for this visualization.");
+                    d3.select(".genreInfoBar").style("display", "block"); 
+                } else {
+                    d3.select(".genreInfoBar").style("display", "none"); 
+                }
+
+                // adjust width and margin based on the selected variable (specifically for Episode_length)
+                var width = variable === "Episode_length" ? 1600 : 800; // double the width for ep len
+                var height = 500;
+                var margin = {top: 20, right: 20, bottom: variable === "Episode_length" ? 175 : 100, left: 80}; // extend bottom margin for ep len
+
+                var svg = d3.select(containerId)
+                            .append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                            .append("g")
+                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                var chartWidth = width - margin.left - margin.right;
+                var chartHeight = height - margin.top - margin.bottom;
+
+                // if 'Genres' is selected, use the primary or secondary genre based on the button's state
+                // choosing primary or secondary "object" was derived from ChatGPT and StackOverflow
+                var counts;
+                if (variable === "Genres") {
+                    counts = d3.nest()
+                                .key(function(d) {
+                                    var genres = d[variable].split(",");
+                                    return genreType === "primary" ? genres[0].trim() : genres[1]?.trim() || "No Secondary Genre";
+                                })
+                                .rollup(function(v) { return v.length; })
+                                .entries(data);
+                } else {
+                    counts = d3.nest()
+                                .key(function(d) { return d[variable]; })
+                                .rollup(function(v) { return v.length; })
+                                .entries(data);
+                }
+
+                counts.sort(function(a, b) { return b.values - a.values; });
+
+                var x = d3.scale.ordinal()
+                        .rangeRoundBands([0, chartWidth], 0.1)
+                        .domain(counts.map(function(d) { return d.key; }));
+
+                var y = d3.scale.linear()
+                        .range([chartHeight, 0])
+                        .domain([0, d3.max(counts, function(d) { return d.values; })]);
+
+                var xAxis = d3.svg.axis()
+                            .scale(x)
+                            .orient("bottom");
+
+                var yAxis = d3.svg.axis()
+                            .scale(y)
+                            .orient("left")
+                            .ticks(10);
+
+                // x-axis
+                svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + chartHeight + ")")
+                .call(xAxis)
+                .selectAll("text")
+                .attr("dx", "-.8em")
+                .attr("dy", ".50em")
+                .attr("y", variable === "Episode_length" ? -5 : 0) // push the labels further down for Episode_length
+                .attr("transform", variable === "Episode_length" ? "rotate(-90)" : "rotate(-45)")
+                .style("text-anchor", "end");
+
+                // y-axis
+                svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxis)
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -60)
+                .attr("x", -chartHeight / 2)
+                .attr("dy", ".71em")
+                .style("text-anchor", "middle")
+                .style('fill', 'darkblue')
+                .text("Count");
+
+                // bars
+                svg.selectAll(".bar")
+                .data(counts)
+                .enter().append("rect")
+                .attr("class", "bar")
+                .attr("x", function(d) { return x(d.key); })
+                .attr("width", x.rangeBand())
+                .attr("y", function(d) { return y(d.values); })
+                .attr("height", function(d) { return chartHeight - y(d.values); })
+                .attr("fill", "steelblue");
+
+                // x-axis label
+                svg.append("text")
+                .attr("x", chartWidth / 2)
+                .attr("y", chartHeight + margin.bottom - 15)
+                .attr("text-anchor", "middle")
+                .style('fill', 'darkblue')
+                .text(variable);
+            }
+
+            // func to update HISTROGRAM
+            function updateHistogram(variable) {
+                d3.select("#histogram").html("");
+
+                if (categoricalVars.indexOf(variable) !== -1) {
+                    d3.select("#histogram").append("p").text("Selected variable is not numerical.");
+                    return;
+                }
+
+                var width = 700, height = 500, margin = {top: 20, right: 20, bottom: 80, left: 80};
+
+                var svg = d3.select("#histogram")
+                            .append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                            .append("g")
+                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                var chartWidth = width - margin.left - margin.right;
+                var chartHeight = height - margin.top - margin.bottom;
+
+                var values = data.map(function(d) { return d[variable]; });
+
+                var x = d3.scale.linear()
+                          .domain(d3.extent(values))
+                          .range([0, chartWidth])
+                          .nice();
+
+                var histogram = d3.layout.histogram()
+                                  .bins(x.ticks(20))
+                                  (values);
+
+                var y = d3.scale.linear()
+                          .domain([0, d3.max(histogram, function(d) { return d.y; })])
+                          .range([chartHeight, 0]);
+
+                var xAxis = d3.svg.axis()
+                              .scale(x)
+                              .orient("bottom");
+
+                var yAxis = d3.svg.axis()
+                              .scale(y)
+                              .orient("left")
+                              .ticks(10);
+
+                // x-axis line
+                svg.append("g")
+                   .attr("class", "x axis")
+                   .attr("transform", "translate(0," + chartHeight + ")")
+                   .call(xAxis);
+                
+                // y-axis
+                svg.append("g")
+                   .attr("class", "y axis")
+                   .call(yAxis)
+                   .append("text")
+                   .attr("transform", "rotate(-90)")
+                   .attr("y", -60)
+                   .attr("x", -chartHeight / 2)
+                   .attr("dy", ".71em")
+                   .style("text-anchor", "middle")
+                   .style('fill', 'darkorange')
+                   .text("Frequency");
+
+                // bars
+                var bar = svg.selectAll(".bar").data(histogram).enter().append("g")
+                             .attr("class", "bar")
+                             .attr("transform", function(d) { return "translate(" + x(d.x) + "," + y(d.y) + ")"; });
+                bar.append("rect")
+                   .attr("x", 1)
+                   .attr("width", function(d) { return Math.max(0, x(d.dx) - x(0) - 1); })
+                   .attr("height", function(d) { return chartHeight - y(d.y); })
+                   .attr("fill", "orange");
+
+                // x-axis label
+                svg.append("text")
+                   .attr("x", chartWidth / 2)
+                   .attr("y", chartHeight + margin.bottom - 30)
+                   .attr("text-anchor", "middle")
+                   .style('fill', 'darkorange')
+                   .text(variable);
+            }
+
+// ==================================================== PIE CHART ====================================================
+            // initially hide the genreInfo div and secondaryPieChart
+            d3.select(".genreInfo").style("display", "none");
+            d3.select("#secondaryPieChart").style("display", "none");
+
+            var secondaryChartButton = d3.select("#buttonContainer").append("button")
+                .text("Show Secondary Genres Pie Chart")
+                .style("display", "none")  // initially hidden
+                .style("margin-left", "10px")  // add margin for spacing between dropdown and button
+                .on("click", function() {
+                    var isVisible = d3.select("#secondaryPieChart").style("display") === "none";
+                    if (isVisible) {
+                        updatePieChart("Genres", "secondary");
+                        d3.select("#secondaryPieChart").style("display", "block");
+                        d3.select("#secondaryPieChartTitle").style("display", "block"); // show title
+                        d3.select("#secondaryPieChartTitle").text("Secondary Genre Pie Chart");
+                        secondaryChartButton.text("Hide Secondary Genres Pie Chart");
+                    } else {
+                        d3.select("#secondaryPieChart").style("display", "none");
+                        d3.select("#secondaryPieChartTitle").style("display", "none"); // hide title
+                        secondaryChartButton.text("Show Secondary Genres Pie Chart");
+                    }
+                });
+
+            // initializing pie chart based on page opening
+            updatePieChart("Genres", "primary");
+
+            // bug where genreInfo and button didn't display, it is fixed now
+            d3.select(".genreInfoPie").style("display", "block"); 
+            secondaryChartButton.style("display", "inline-block"); 
+            d3.select("#pieChartTitle").text("Primary Genre Pie Chart");
+
+            d3.select("#pieChartSelect").on("change", function() {
+                var selectedCategory = d3.select(this).property("value");
+                // hiding secondary chart when changing category
+                d3.select("#secondaryPieChart").style("display", "none"); 
+
+                // hiding button, genreinfo, and title upon category change
+                secondaryChartButton.style("display", "none"); 
+                d3.select(".genreInfoPie").style("display", "none"); 
+                d3.select("#secondaryPieChartTitle").style("display", "none"); 
+
+                // show the button and title for each selected pie chart
+                if (selectedCategory === "Genres") {
+                    secondaryChartButton.style("display", "inline-block");
+                    d3.select(".genreInfoPie").style("display", "block"); 
+                    d3.select("#pieChartTitle").text("Primary Anime Genre Pie Chart"); 
+                } else if (selectedCategory === "Manga_Demographics") {
+                    d3.select("#pieChartTitle").text("Manga Demographics Pie Chart"); 
+                } else if (selectedCategory === "Stream_type") {
+                    d3.select("#pieChartTitle").text("Anime Stream Type Pie Chart");
+                } else if (selectedCategory === "Episode_length") {
+                    d3.select("#pieChartTitle").text("Average Episode Length per Anime Pie Chart");
+                }
+                updatePieChart(selectedCategory, "primary");
+            });
+
+            function updatePieChart(category, genreType) {
+                var containerId = genreType === "primary" ? "#pieChart" : "#secondaryPieChart";
+                // clear the selected pie chart container
+                d3.select(containerId).html(""); 
+
+                var width = 1600, height = 700, radius = Math.min(width, height) / 2 - 75;
+                var color = d3.scale.category20();
+
+                var svg = d3.select(containerId)
+                            .append("svg")
+                            .attr("width", width)
+                            .attr("height", height)
+                            .append("g")
+                            .attr("transform", "translate(" + width / 3 + "," + height / 2 + ")");
+
+                var dataByCategory = {};
+
+                if (category === "Genres") {
+                    data.forEach(function(d) {
+                        // select primary or secondary genre based on genreType
+                        var genres = d.Genres.split(",");
+                        var selectedGenre = (genreType === "primary") ? genres[0].trim() : genres[1]?.trim();
+                        if (selectedGenre) {
+                            if (dataByCategory[selectedGenre]) {
+                                dataByCategory[selectedGenre]++;
+                            } else {
+                                dataByCategory[selectedGenre] = 1;
+                            }
+                        }
+                    });
+                } else if (category === "Stream_type") {
+                    data.forEach(function(d) {
+                        var streamType = d.Stream_type;
+                        if (dataByCategory[streamType]) {
+                            dataByCategory[streamType]++;
+                        } else {
+                            dataByCategory[streamType] = 1;
+                        }
+                    });
+                } else if (category === "Manga_Demographics") {
+                    data.forEach(function(d) {
+                        var dem = d.Manga_Demographics;
+                        if (dem !== '[]') {
+                            if (dataByCategory[dem]) {
+                                dataByCategory[dem]++;
+                            } else {
+                                dataByCategory[dem] = 1;
+                            }
+                        }
+                    });
+                } else if (category === "Episode_length") {
+                    data.forEach(function(d) {
+                        var episodeLength = d["Episode_length"];
+                        if (dataByCategory[episodeLength]) {
+                            dataByCategory[episodeLength]++;
+                        } else {
+                            dataByCategory[episodeLength] = 1;
+                        }
+                    });
+                }
+
+                var dataArray = [];
+                for (var key in dataByCategory) {
+                    dataArray.push({label: key, value: dataByCategory[key]});
+                }
+                dataArray.sort(function(a, b) { return b.value - a.value; });
+
+                // comparing sum of last two percs and compare to third-to-smallest perc
+                // if smaller, combine to form an 'Others' section
+                if (dataArray.length > 5) {
+                    var lastTwoSum = dataArray[dataArray.length - 1].value + dataArray[dataArray.length - 2].value;
+                    var thirdToSmallest = dataArray[dataArray.length - 3].value;
+                    if (lastTwoSum < thirdToSmallest) {
+                        var others = lastTwoSum;
+                        dataArray.splice(dataArray.length - 2, 2); // remove last two
+                        dataArray.push({label: "Others", value: others});
+                    }
+                }
+
+                // drawing lines were inspired from https://gist.github.com/dbuezas/9306799 and ChatGPT
+                // it's confusing to imagine doing that by itself ><
+
+                var topN = 6; 
+                var topData = dataArray.slice(0, 5);
+                var others = d3.sum(dataArray.slice(5), function(d) { return d.value; });
+                if (dataArray.length > 5) {
+                    topData.push({label: "Others", value: others});
+                }
+
+                var pie = d3.layout.pie()
+                            .sort(null)
+                            .value(function(d) { return d.value; });
+
+                var arc = d3.svg.arc()
+                            .outerRadius(radius)
+                            .innerRadius(0);
+
+                var outerArc = d3.svg.arc()
+                                .innerRadius(radius * 1.1)
+                                .outerRadius(radius * 1.4);
+
+                var g = svg.selectAll(".arc")
+                        .data(pie(topData))
+                        .enter().append("g")
+                        .attr("class", "arc");
+
+                // add paths for pie slices
+                g.append("path")
+                .attr("d", arc)
+                .attr("fill", function(d) { return color(d.data.label); });
+
+                // labeling percentages
+                g.append("text")
+                .attr("transform", function(d) {
+                    var pos = outerArc.centroid(d);
+                    var percentage = (d.value / d3.sum(topData, function(d) { return d.value; })) * 100;
+                    
+                    // extend labels based on percentage size to prevent *extremely* annoying overlapping
+                    if (percentage < 2) {
+                        pos[0] *= 1.05; // only slightly extend
+                    } else {
+                        pos[0] *= 1.2; // EXTENDDDDDD!!!
+                    }
+                    
+                    return "translate(" + pos + ")";
+                })
+                .attr("dy", ".35em")
+                .attr("text-anchor", function(d) {
+                    return (d.startAngle + (d.endAngle - d.startAngle) / 2) > Math.PI ? "end" : "start";
+                })
+                .style("fill", "#000")
+                .style("font-size", "12px")
+                .text(function(d) { 
+                    var percentage = (d.value / d3.sum(topData, function(d) { return d.value; })) * 100;
+                    return percentage.toFixed(1) + "%";
+                });
+
+                // draw d3 specific polylines connecting labels to pie slices
+                g.append("polyline")
+                .attr("points", function(d) {
+                    var pos = outerArc.centroid(d);
+                    var percentage = (d.value / d3.sum(topData, function(d) { return d.value; })) * 100;
+
+                    if (percentage < 2) {
+                        pos[0] *= 1.05; 
+                    } else {
+                        pos[0] *= 1.2; 
+                    }
+
+                    return [arc.centroid(d), outerArc.centroid(d), pos];
+                })
+                .style("fill", "none")
+                .style("stroke", "black")
+                .style("stroke-width", 1);
+
+                // adding a legend to bottom right
+                var legendRectSize = 18;
+                var legendSpacing = 4;
+
+                var legend = svg.selectAll('.legend')
+                                .data(topData)
+                                .enter()
+                                .append('g')
+                                .attr('class', 'legend')
+                                .attr('transform', function(d, i) {
+                                    var height = legendRectSize + legendSpacing;
+                                    var offset = height * color.domain().length / 2;
+                                    var horz = radius + 200;
+                                    var vert = (height * i) + (height * color.domain().length) - 100;
+                                    return 'translate(' + horz + ',' + vert + ')';
+                                });
+
+                // add corresponding colors to legend :3
+                legend.append('rect')
+                    .attr('width', legendRectSize)
+                    .attr('height', legendRectSize)
+                    .style('fill', function(d) { return color(d.label); })
+                    .style('stroke', color);
+
+                // add text labels so we all know where things go
+                legend.append('text')
+                    .attr('x', legendRectSize + legendSpacing)
+                    .attr('y', legendRectSize - legendSpacing)
+                    .text(function(d) { return d.label; });
+            }
+            
+// ==================================================== SCATTERPLOT ====================================================
+            updateScatterplot();
+
+            d3.selectAll("input[name='xAxis']").on("change", updateScatterplot);
+            d3.selectAll("input[name='yAxis']").on("change", updateScatterplot);
+
+            function updateScatterplot() {
+                d3.select("#scatterplot").html("");
+
+                var xVar = d3.select("input[name='xAxis']:checked").node().value;
+                var yVar = d3.select("input[name='yAxis']:checked").node().value;
+
+                // filter data and remove null values
+                var filteredData = data.filter(function(d) {
+                    if ((xVar === "Manga_Members" || yVar === "Manga_Members") && isNaN(d.Manga_Members)) {
+                        return false;
+                    }
+
+                    // PRIMARY GENRE
+                    if ((xVar === "Genres" || yVar === "Genres")) {
+                        return d.Genres && d.Genres !== "[]" && d.Genres.split(",")[0].trim() !== "";
+                    }
+
+                    return true;
+                });
+
+                var isXVarCategorical = categoricalVars.includes(xVar);
+                var isYVarCategorical = categoricalVars.includes(yVar);
+
+                var margin = {top: 20, right: 40, bottom: 100, left: 200}, 
+                    width = 800 - margin.left - margin.right,
+                    height = 600 - margin.top - margin.bottom;
+
+                var svg = d3.select("#scatterplot").append("svg")
+                            .attr("width", width + margin.left + margin.right)
+                            .attr("height", height + margin.top + margin.bottom)
+                            .append("g")
+                            .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+                // categorical (ordinal) vs numerical (linear)
+                if (isXVarCategorical) {
+                    var x = d3.scale.ordinal()
+                            .domain(filteredData.map(function(d) { return d[xVar].split(",")[0].trim(); }))
+                            .rangePoints([0, width], 1);
+                } else {
+                    var x = d3.scale.linear()
+                            .domain(d3.extent(filteredData, function(d) { return d[xVar]; }))
+                            .range([0, width])
+                            .nice();
+                }
+
+                if (isYVarCategorical) {
+                    var y = d3.scale.ordinal()
+                            .domain(filteredData.map(function(d) { return d[yVar].split(",")[0].trim(); }))
+                            .rangePoints([height, 0], 1);
+                } else {
+                    var y = d3.scale.linear()
+                            .domain(d3.extent(filteredData, function(d) { return d[yVar]; }))
+                            .range([height, 0])
+                            .nice();
+                }
+
+                var xAxisScatter = d3.svg.axis().scale(x).orient("bottom");
+                var yAxisScatter = d3.svg.axis().scale(y).orient("left");
+
+                // x-axis and label
+                var xAxisElement = svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", "translate(0," + height + ")")
+                .call(xAxisScatter);
+
+                xAxisElement.append("text")
+                .attr("x", width / 2)
+                .attr("y", 90)
+                .attr("fill", "#000")
+                .style("text-anchor", "middle")
+                .text(xVar);
+
+                // for Anime members, rotate x-axis to prevent overlapping
+                if (xVar === "Anime_Members") {
+                    xAxisElement.selectAll("g.tick text") 
+                        .attr("transform", "rotate(-45)")
+                        .attr("dx", "-.8em")
+                        .attr("dy", ".15em")
+                        .style("text-anchor", "end");
+                }
+
+                // y-axis and label
+                var yAxisElement = svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxisScatter)
+                .append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -120)
+                .attr("x", -height / 2)
+                .attr("dy", ".71em")
+                .attr("fill", "#000")
+                .style("text-anchor", "middle")
+                .text(yVar);
+
+                // dots dots dots dots dots dots dots 
+                svg.selectAll(".dot")
+                .data(filteredData)
+                .enter().append("circle")
+                .attr("class", "dot")
+                .attr("r", 4)
+                .attr("cx", function(d) { return isXVarCategorical ? x(d[xVar].split(",")[0].trim()) : x(d[xVar]); })
+                .attr("cy", function(d) { return isYVarCategorical ? y(d[yVar].split(",")[0].trim()) : y(d[yVar]); })
+                .attr("fill", "steelblue")
+                .attr("opacity", 0.7)
+                .on("mouseover", function(d) {tooltip.transition().duration(200).style("opacity", .9); // hovering is cool!!!!!!! (from d3 library)
+                    tooltip.html("<strong>Title:</strong> " + d.Title + "<br>" + "<strong>" + xVar + ":</strong> " + (isXVarCategorical ? d[xVar].split(",")[0].trim() : d[xVar]) + "<br>" + "<strong>" + yVar + ":</strong> " + (isYVarCategorical ? d[yVar].split(",")[0].trim() : d[yVar]))
+                            .style("left", (d3.event.pageX + 10) + "px")
+                            .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    tooltip.transition().duration(500).style("opacity", 0);
+                });
+
+                // necessary apparently :P
+                var tooltip = d3.select("body").append("div")	
+                                .attr("class", "tooltip")				
+                                .style("opacity", 0);
+            }
+
+
+
+        });
+    </script>
+</body>
+</html>
